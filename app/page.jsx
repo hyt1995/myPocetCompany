@@ -17,7 +17,7 @@ export default function Home() {
   return (
     <main className="page">
       <header className="top">
-        <h1>내 손안의 회사 v0.1</h1>
+        <h1>내 손안의 회사 v0.2</h1>
         <p>
           부서 {departments.length}개 · AI {aiCount}명
         </p>
