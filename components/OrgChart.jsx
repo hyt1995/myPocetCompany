@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import SecretaryChat from './SecretaryChat';
 
 export default function OrgChart({ departments }) {
   const [openId, setOpenId] = useState(null);
@@ -46,9 +47,13 @@ export default function OrgChart({ departments }) {
                 <h3>배치된 AI</h3>
                 <p>{d.members.length > 0 ? `${d.members.length}명` : '아직 없음'}</p>
 
-                <div className="chat">
-                  AI 대화가 여기에 실시간으로 표시됩니다 (연결 전)
-                </div>
+                {d.id === 'secretary' ? (
+                  <SecretaryChat />
+                ) : (
+                  <div className="chat">
+                    AI 대화가 여기에 실시간으로 표시됩니다 (연결 전)
+                  </div>
+                )}
               </div>
             )}
           </article>

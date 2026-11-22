@@ -161,6 +161,73 @@ body {
   text-align: center;
 }
 
+.chat-box {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.checks {
+  display: flex;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ask {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ask input,
+.ask textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px; /* iOS 자동 확대 방지 */
+}
+
+.ask button {
+  padding: 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--card);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ask button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.msg {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--chip);
+  white-space: pre-wrap;
+}
+
+.msg small {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.msg.error {
+  color: #c0392b;
+}
+
 .empty {
   margin-top: 20px;
   color: var(--muted);
