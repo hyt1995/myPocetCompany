@@ -1,0 +1,18 @@
+{
+  "name": "mpc-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "내 손안의 회사 - 노트북 매매 프로그램 (바이낸스 현물, 모의매매 + 서명된 실전 주문)",
+  "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "start": "node --env-file=.env src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "ccxt": "^4.4.0",
+    "firebase": "^11.0.0"
+  }
+}

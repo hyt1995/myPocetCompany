@@ -10,8 +10,11 @@ AI 부서들이 일하고, 사장님은 폰으로 확인·지시하는 1인 회�
   이 사이트의 컬렉션은 전부 `mpc_` 접두사 (focus-app 데이터와 안 섞이게). 목록은 `lib/firebase.js`의 `COL`.
 - AI: Claude API. 호출은 반드시 `lib/claude.js`의 `callClaude()` 하나만 거친다.
   (호출마다 비용을 `mpc_ai_calls`에 기록. 나중에 비용 한도·킬 스위치도 여기에 넣는다.)
-- 매매 프로그램: **사장님 노트북**에서 돌아간다 (사장님이 만든 기존 프로그램을 연결 예정).
-  사이트와는 Firestore로만 주고받는다. 규격은 `WORKER_PROTOCOL.md` — 이 규격을 바꾸면 문서도 같이 고친다.
+- 매매 프로그램: `worker/` (Node.js, ccxt + Firebase 웹 SDK). **사장님 노트북(Ubuntu 20.04)**에서 pm2로 돌아간다.
+  사이트와는 Firestore로만 주고받는다. 규격은 `WORKER_PROTOCOL.md` — 규격을 바꾸면 문서, 사이트 `lib/`, `worker/src/`를 같이 고친다.
+  기존 파이썬 봇(선물·레버리지·물타기)은 쓰지 않고 새로 만들었다. RSI·이동평균 계산은 기존 GetRSI/GetMA와 같은 값 (테스트로 확인).
+  순수 로직(indicators, strategy, paper, signature)은 외부 의존 없이 `cd worker && npm test` 로 테스트한다.
+  바이낸스 실전 주문은 기본 테스트넷(`BINANCE_TESTNET=true`), 실전 허용 기본 꺼짐 — 노트북 `.env`에서만 바꿀 수 있다.
 
 ## 환경변수 (Vercel에만 저장, 코드·GitHub에 절대 넣지 않는다)
 - `ANTHROPIC_API_KEY` — Claude API 키
@@ -46,5 +49,5 @@ AI 부서들이 일하고, 사장님은 폰으로 확인·지시하는 1인 회�
   부서 화면: 직원 목록(모의 수익률 순), [+ 직원 추가], 부서 공통 지침, 노트북 연결 상태.
 
 ## 다음 할 일
-- 노트북 매매 프로그램 연결 (사장님이 기존 프로그램을 WORKER_PROTOCOL.md 에 맞게 수정)
+- 노트북에 worker 설치·실행 (worker/README.md) → 모의매매 확인 → 테스트넷 → 소액 실전
 - 비서: API 크레딧·토큰 비용 보고 (충전액 $8 − 누적 비용) → 매출·비용 장부 → 구글 캘린더 → 아침 텔레그램 브리핑
