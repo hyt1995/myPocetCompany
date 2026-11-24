@@ -44,9 +44,6 @@ export default function OrgChart({ departments }) {
                   ))}
                 </ul>
 
-                <h3>팀원</h3>
-                <p>{team.length > 0 ? team.map((m) => m.name).join(', ') : '아직 없음'}</p>
-
                 {d.id === 'secretary' && <SecretaryChat />}
 
                 {team.length > 0 && (

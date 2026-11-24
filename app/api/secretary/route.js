@@ -1,15 +1,13 @@
 import { callClaude, ClaudeError, MODELS } from '../../../lib/claude';
+import { buildSystemPrompt, getMember } from '../../../lib/members';
 import { isValidPasscode } from '../../../lib/passcode';
 
-// '내 비서'에게 질문 하나를 보내고 답을 받는다.
-// 다음 단계에서 일정·비용·손익 데이터를 함께 넘겨 실제 숫자로 답하게 한다.
+// 조직도 비서 카드의 빠른 질문. 비서 직원(secretary-1)의 지침을 그대로 쓴다.
+// 지침은 비서 부서 화면에서 고칠 수 있다.
 
 export const dynamic = 'force-dynamic';
 
 const MAX_INPUT_CHARS = 500;
-
-const SYSTEM_PROMPT =
-  "너는 '내 손안의 회사'의 비서 AI다. 사장님(사용자)의 질문에 한국어로 짧고 정확하게 답한다. 모르는 것은 모른다고 말한다.";
 
 export async function POST(request) {
   let body;
@@ -29,11 +27,17 @@ export async function POST(request) {
   }
 
   try {
+    const member = await getMember('secretary-1');
+    const system = member
+      ? await buildSystemPrompt(member)
+      : "너는 '내 손안의 회사'의 비서다. 한국어로 짧고 정확하게 답한다.";
+
     const result = await callClaude({
       department: 'secretary',
-      purpose: 'chat',
-      model: MODELS.cheap,
-      system: SYSTEM_PROMPT,
+      memberId: 'secretary-1',
+      purpose: 'quick-chat',
+      model: MODELS[member?.model] || MODELS.cheap,
+      system,
       messages: [{ role: 'user', content: question }],
       maxTokens: 300,
     });

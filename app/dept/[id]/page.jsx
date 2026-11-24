@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import DepartmentRoom from '../../../components/DepartmentRoom';
+import DepartmentOverview from '../../../components/DepartmentOverview';
+import { PasscodeGate } from '../../../components/passcode';
 import { findDepartment } from '../../../lib/departments';
 
 export default async function DepartmentPage({ params }) {
@@ -18,11 +19,9 @@ export default async function DepartmentPage({ params }) {
         <p>{dept.role}</p>
       </header>
 
-      {dept.defaultMembers.length > 0 ? (
-        <DepartmentRoom departmentId={dept.id} />
-      ) : (
-        <p className="empty">아직 배치된 팀원이 없어요.</p>
-      )}
+      <PasscodeGate>
+        <DepartmentOverview dept={{ id: dept.id, name: dept.name, trading: dept.trading }} />
+      </PasscodeGate>
     </main>
   );
 }
