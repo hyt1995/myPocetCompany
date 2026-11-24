@@ -12,7 +12,7 @@ export default function Home() {
     minute: '2-digit',
   });
 
-  const aiCount = departments.reduce((sum, d) => sum + d.members.length, 0);
+  const aiCount = departments.reduce((sum, d) => sum + (d.defaultMembers || []).length, 0);
 
   return (
     <main className="page">

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import SecretaryChat from './SecretaryChat';
 
@@ -14,6 +15,8 @@ export default function OrgChart({ departments }) {
     <section className="org" aria-label="조직도">
       {departments.map((d) => {
         const open = openId === d.id;
+        const team = d.defaultMembers || [];
+        const active = d.statusLabel === '운영 중';
         return (
           <article key={d.id} className="dept">
             <button
@@ -22,11 +25,8 @@ export default function OrgChart({ departments }) {
               aria-expanded={open}
               onClick={() => setOpenId(open ? null : d.id)}
             >
-              <span>
-                <span className="dept-name">{d.name}</span>
-                <span className="dept-code">{d.code}</span>
-              </span>
-              <span className="badge">
+              <span className="dept-name">{d.name}</span>
+              <span className={active ? 'badge on' : 'badge'}>
                 <span className="dot" aria-hidden="true" />
                 {d.statusLabel}
               </span>
@@ -44,15 +44,19 @@ export default function OrgChart({ departments }) {
                   ))}
                 </ul>
 
-                <h3>배치된 AI</h3>
-                <p>{d.members.length > 0 ? `${d.members.length}명` : '아직 없음'}</p>
+                <h3>팀원</h3>
+                <p>{team.length > 0 ? team.map((m) => m.name).join(', ') : '아직 없음'}</p>
 
-                {d.id === 'secretary' ? (
-                  <SecretaryChat />
-                ) : (
-                  <div className="chat">
-                    AI 대화가 여기에 실시간으로 표시됩니다 (연결 전)
-                  </div>
+                {d.id === 'secretary' && <SecretaryChat />}
+
+                {team.length > 0 && (
+                  <Link href={`/dept/${d.id}`} className="enter">
+                    부서로 들어가기 →
+                  </Link>
+                )}
+
+                {d.id !== 'secretary' && team.length === 0 && (
+                  <div className="chat">팀원이 배치되면 여기서 일을 시킬 수 있어요</div>
                 )}
               </div>
             )}
