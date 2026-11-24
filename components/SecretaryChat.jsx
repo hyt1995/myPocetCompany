@@ -68,6 +68,7 @@ export default function SecretaryChat() {
       <div className="checks">
         <span>{mark(health?.anthropicKey)} API 키</span>
         <span>{mark(health?.passcode)} 비밀번호</span>
+        <span>{dbMark(health?.firestore)} DB</span>
       </div>
 
       <form onSubmit={ask} className="ask">
@@ -97,7 +98,8 @@ export default function SecretaryChat() {
           <p>{answer.reply}</p>
           <small>
             {answer.model} · 입력 {answer.usage?.input_tokens ?? '?'} / 출력{' '}
-            {answer.usage?.output_tokens ?? '?'} 토큰
+            {answer.usage?.output_tokens ?? '?'} 토큰 · {formatUsd(answer.costUsd)} ·{' '}
+            {answer.logged ? '비용 기록됨' : '비용 기록 안 됨 (DB 미연결)'}
           </small>
         </div>
       )}
@@ -108,4 +110,16 @@ export default function SecretaryChat() {
 function mark(ok) {
   if (ok === undefined) return '…';
   return ok ? '✓' : '✗';
+}
+
+function dbMark(state) {
+  if (state === undefined) return '…';
+  if (state === 'ok') return '✓';
+  if (state === 'missing') return '✗ 미등록';
+  return '✗ 오류';
+}
+
+function formatUsd(value) {
+  if (typeof value !== 'number') return '비용 계산 불가';
+  return `$${value.toFixed(6)}`;
 }
