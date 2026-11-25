@@ -11,17 +11,22 @@ export default function ChatTab({ member, trading, onMemberChanged }) {
   const api = useApi();
   const [messages, setMessages] = useState([]);
   const [results, setResults] = useState([]);
+  const [proposals, setProposals] = useState({}); // id → 확인 카드
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
   const chatEndRef = useRef(null);
 
+  const addProposals = (list = []) =>
+    setProposals((prev) => ({ ...prev, ...Object.fromEntries(list.map((p) => [p.id, p])) }));
+
   useEffect(() => {
-    api(`/api/members/${member.id}`)
+    api(`/api/members/${member.id}?include=chat`)
       .then((data) => {
         setMessages(data.messages || []);
         setResults(data.results || []);
+        addProposals(data.proposals);
       })
       .catch((err) => setError(err.message));
   }, [member.id, api]);
@@ -44,9 +49,16 @@ export default function ChatTab({ member, trading, onMemberChanged }) {
         method: 'POST',
         body: JSON.stringify({ message: text }),
       });
+      addProposals(data.proposals);
       setMessages((prev) => [
         ...prev,
-        { id: `local-${now}-a`, role: 'assistant', content: data.reply, at: Date.now() },
+        {
+          id: `local-${now}-a`,
+          role: 'assistant',
+          content: data.reply,
+          proposalIds: (data.proposals || []).map((p) => p.id),
+          at: Date.now(),
+        },
       ]);
       setResults((prev) => [
         { id: data.resultId, task: text, output: data.reply, model: data.model, costUsd: data.costUsd, status: 'new', at: Date.now() },
@@ -91,8 +103,18 @@ export default function ChatTab({ member, trading, onMemberChanged }) {
         <div className="chat-log">
           {messages.length === 0 && <p className="hint">아직 대화가 없어요.</p>}
           {messages.map((m) => (
-            <div key={m.id} className={m.role === 'user' ? 'bubble me' : 'bubble ai'}>
-              {m.content}
+            <div key={m.id} className="chat-item">
+              <div className={m.role === 'user' ? 'bubble me' : 'bubble ai'}>{m.content}</div>
+              {(m.proposalIds || []).map((pid) =>
+                proposals[pid] ? (
+                  <ProposalCard
+                    key={pid}
+                    proposal={proposals[pid]}
+                    memberId={member.id}
+                    onChange={(p) => addProposals([p])}
+                  />
+                ) : null,
+              )}
             </div>
           ))}
           {sending && <div className="bubble ai pending">작업 중…</div>}
@@ -138,6 +160,56 @@ export default function ChatTab({ member, trading, onMemberChanged }) {
         </div>
       </section>
     </>
+  );
+}
+
+const PROPOSAL_STATUS = { executed: '실행함', cancelled: '취소함', invalid: '만들 수 없음' };
+
+// 채팅 확인 카드. [실행]을 눌러야 명령·설정 변경이 일어난다. 실제 돈은 확인창을 한 번 더 거친다.
+function ProposalCard({ proposal: p, memberId, onChange }) {
+  const api = useApi();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const live = p.kind === 'order' && p.params?.mode === 'live';
+  const open = p.status === 'proposed' && !p.expired;
+
+  async function act(action) {
+    if (action === 'execute' && live && !window.confirm(`실제 돈으로 주문합니다.\n${p.summary}\n계속할까요?`)) return;
+    setBusy(true);
+    setNote('');
+    try {
+      const r = await api(`/api/members/${memberId}/proposals/${p.id}`, {
+        method: 'POST',
+        body: JSON.stringify({ action, confirmLive: live && action === 'execute' ? true : undefined }),
+      });
+      onChange({ ...p, status: r.status });
+      setNote(r.message || '');
+    } catch (err) {
+      setNote(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={`proposal ${live ? 'live' : ''} ${p.status}`}>
+      <div className="proposal-head">
+        <strong>{p.summary}</strong>
+        {!open && <span className="chip">{p.expired ? '만료' : PROPOSAL_STATUS[p.status] || p.status}</span>}
+      </div>
+      {p.error && <p className="hint">{p.error}</p>}
+      {open && (
+        <div className="result-actions">
+          <button type="button" className={live ? 'live' : ''} disabled={busy} onClick={() => act('execute')}>
+            {live ? '실제로 실행' : '실행'}
+          </button>
+          <button type="button" className="secondary" disabled={busy} onClick={() => act('cancel')}>
+            취소
+          </button>
+        </div>
+      )}
+      {note && <p className="hint">{note}</p>}
+    </div>
   );
 }
 

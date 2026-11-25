@@ -17,10 +17,18 @@
 
 ## 프로그램이 해야 할 일 (요약)
 
-1. 30초마다 연결 상태 쓰기 → `mpc_worker/status`
-2. `mpc_commands` 에서 `status == 'pending'` 인 명령을 실시간으로 받아 처리 (`onSnapshot`)
-3. 자동 실행: 직원 중 `mode == 'paper'` 이고 `autoRun == true` 인 직원의 승인 전략을 `checkEveryMinutes` 마다 확인해 모의매매
-4. 체결하면 `mpc_trades` 에 기록하고 `mpc_positions` 를 갱신 (현재가 `lastPrice` 도 주기적으로 갱신)
+프로그램은 **주기적으로 DB를 확인하지 않는다.** Firestore 실시간 리스너(`onSnapshot`)로 '바뀔 때만' 알림을 받고,
+스케줄은 프로그램 안의 타이머(알람)로 돌린다.
+
+1. 리스너 ① `mpc_commands` 의 `status == 'pending'` → 새 명령이 생기면 바로 처리
+2. 리스너 ② `mpc_members` 의 `departmentId == 'investment'` → 모드·자동 실행·스케줄·승인 전략이 바뀌면 그 직원의 알람만 다시 맞춤
+3. 알람: `mode == 'paper'` + `autoRun == true` + 승인 전략이 있는 직원마다 다음 실행 시각에 타이머 하나.
+   울리면 승인 전략으로 확인 → 조건이 맞으면 모의매매 → 다음 시각으로 다시 맞춤.
+   예약할 때 `mpc_worker/status.nextRuns.{memberId}` 에 다음 시각을 적는다 (사이트 표시용)
+4. 체결하면 `mpc_trades` 에 기록하고 `mpc_positions` 를 갱신. 현재가(`lastPrice`)는 알람 실행 때와 `refresh_prices` 명령 때만 갱신
+5. 5분마다 연결 상태 쓰기 → `mpc_worker/status` (사이트는 12분 안에 신호가 있으면 '연결됨')
+
+아무 일이 없을 때 DB 사용량은 연결 신호 하루 288건뿐이다.
 
 ---
 
@@ -32,7 +40,8 @@
 | `departmentId` | 매매 직원은 `'investment'` |
 | `name`, `method` | 이름, 매매 방법 |
 | `mode` | `'stopped'` \| `'paper'` — 자동 실행 모드. **실전 자동 모드는 없다** |
-| `autoRun` | `true` 면 전략의 `checkEveryMinutes` 마다 자동 실행 |
+| `autoRun` | `true` 면 `schedule` 대로 자동 실행 |
+| `schedule` | `{ type: 'strategy' }` 전략의 `checkEveryMinutes` 마다 (기본) · `{ type: 'interval', minutes: 30 }` N분마다 (한국 시간 자정 기준으로 맞춤: 30분 → :00, :30) · `{ type: 'times', times: ['09:00', '21:00'] }` 매일 정해진 시각 (한국 시간). 계산은 `lib/schedule.js` = `worker/src/schedule.js` |
 | `paperCapitalUsdt` | 모의 시작 가상자금 (USDT) |
 | `activeStrategyVersion` | 승인된 전략 버전 번호 (없으면 `null`) |
 
@@ -88,7 +97,7 @@
 | 필드 | 설명 |
 | --- | --- |
 | `memberId`, `departmentId` | 어느 직원의 명령인지 |
-| `type` | `run` \| `paper_buy` \| `paper_sell` \| `live_buy` \| `live_sell` |
+| `type` | `run` \| `refresh_prices` \| `paper_buy` \| `paper_sell` \| `live_buy` \| `live_sell` |
 | `strategyVersion` | 명령 당시 승인 전략 버전 |
 | `symbol` | 예: `BTCUSDT` (`run` 은 `null`) |
 | `quoteAmountUsdt` | 매수 금액 (buy 만) |
@@ -105,6 +114,8 @@
 ```
 
 - `run`: 그 직원의 승인 전략 조건을 지금 한 번 확인 → 맞으면 **모의**매매
+- `refresh_prices`: 그 직원이 보유 중인 코인(모의·실전)의 `lastPrice` 갱신. 사이트 현황 탭을 열 때 자동으로 온다
+- 명령은 사이트 버튼이나 **채팅 확인 카드**에서 사장님이 [실행]을 눌렀을 때만 생긴다 (`lib/proposals.js`)
 - `paper_buy` / `paper_sell`: 지금 시세로 모의 체결
 - `live_buy` / `live_sell`: **아래 검증을 모두 통과할 때만** 바이낸스 실제 주문
 
@@ -154,11 +165,12 @@ function verify(c, id, secret = process.env.COMMAND_SIGNING_SECRET) {
 
 ## 3. 쓰는 것
 
-### 연결 상태 `mpc_worker/status` (30초마다)
+### 연결 상태 `mpc_worker/status` (5분마다 + 알람 예약할 때)
 ```js
-{ lastSeenAt: Date.now(), version: '1.0.0', host: '노트북 이름', liveEnabled: false, testnet: true }
+{ lastSeenAt: Date.now(), version: '1.0.0', host: '노트북 이름', liveEnabled: false, testnet: true,
+  nextRuns: { [memberId]: 다음 자동 실행 시각(ms) | null } }
 ```
-사이트는 `lastSeenAt` 이 2분 이내면 '연결됨'으로 표시한다.
+사이트는 `lastSeenAt` 이 12분 이내면 '연결됨'으로 표시하고, 프로그램 탭에 `nextRuns` 로 다음 실행 시각을 보여준다.
 
 ### 체결 기록 `mpc_trades/{autoId}` (체결마다 추가)
 ```js

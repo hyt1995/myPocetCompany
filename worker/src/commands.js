@@ -20,7 +20,7 @@ import {
 import { liveBuy, liveSell, resetStopLoss } from './live.js';
 import { log } from './log.js';
 import { verifySignature } from './signature.js';
-import { paperBuy, paperSell, runStrategy } from './trading.js';
+import { paperBuy, paperSell, refreshMemberPrices, runStrategy } from './trading.js';
 
 class Rejected extends Error {}
 
@@ -52,6 +52,8 @@ async function execute(id, c, member) {
       const messages = await runStrategy(member, strategy, { commandId: id, trigger: '지금 실행' });
       return { message: messages.join(' / ') };
     }
+    case 'refresh_prices':
+      return refreshMemberPrices(member);
     case 'paper_buy':
       return paperBuy({ ...meta, symbol: c.symbol, quoteAmountUsdt: Number(c.quoteAmountUsdt), reason: '수동' });
     case 'paper_sell':

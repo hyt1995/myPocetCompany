@@ -41,6 +41,7 @@ export const MODE_LABELS = { stopped: '정지', paper: '모의' };
 
 export const COMMAND_LABELS = {
   run: '지금 실행',
+  refresh_prices: '가격 갱신',
   paper_buy: '모의 매수',
   paper_sell: '모의 매도',
   live_buy: '실제 매수',

@@ -1,12 +1,18 @@
 // 내 손안의 회사 — 노트북 매매 프로그램
 // 실행: npm start   (설정은 .env, 설명은 README.md)
+//
+// 평소에는 아무것도 하지 않고 기다린다. 움직이는 때는 세 가지뿐이다:
+//   1. 사이트에서 명령이 생겼을 때 (Firestore 리스너가 알려준다)
+//   2. 직원의 스케줄·모드·전략이 바뀌었을 때 (Firestore 리스너가 알려준다) → 알람 다시 맞춤
+//   3. 알람(스케줄) 시각이 됐을 때 → 승인 전략으로 모의매매
+// 그리고 5분마다 연결 신호를 한 번 쓴다.
 
-import { autorunTick, refreshPrices } from './autorun.js';
 import { handleCommand } from './commands.js';
 import { checkConfig, config } from './config.js';
-import { heartbeat, initDb, onPendingCommands } from './db.js';
+import { heartbeat, initDb, onPendingCommands, onTradingMembers } from './db.js';
 import { log } from './log.js';
 import { enqueue } from './queue.js';
+import { stopAll, syncMembers } from './scheduler.js';
 
 const problems = checkConfig();
 if (problems.length) {
@@ -23,30 +29,25 @@ log(
     : '실전: 꺼짐 (모의매매만)',
 );
 
-const timers = [];
-const safe = (label, fn) => () => fn().catch((err) => log(`${label} 오류: ${err.message}`));
-
 await heartbeat().catch((err) => {
   console.error(`Firestore 연결 실패: ${err.message}`);
   process.exit(1);
 });
-timers.push(setInterval(safe('연결 신호', heartbeat), config.heartbeatMs));
+const beat = setInterval(() => heartbeat().catch((err) => log(`연결 신호 오류: ${err.message}`)), config.heartbeatMs);
 
-const unsubscribe = onPendingCommands(
+const stopCommands = onPendingCommands(
   (id, data) => enqueue(() => handleCommand(id, data)).catch((err) => log(`명령 처리 오류: ${err.message}`)),
   (err) => log(`명령 구독 오류: ${err.message}`),
 );
-log('사이트 명령 대기 중');
-
-const tick = safe('자동 실행', autorunTick);
-tick();
-timers.push(setInterval(tick, config.tickMs));
-timers.push(setInterval(safe('시세 갱신', () => enqueue(refreshPrices)), config.priceRefreshMs));
+const stopMembers = onTradingMembers(syncMembers, (err) => log(`직원 구독 오류: ${err.message}`));
+log('사이트 명령과 직원 설정 변경을 기다리는 중');
 
 function shutdown() {
   log('매매 프로그램 종료');
-  timers.forEach(clearInterval);
-  unsubscribe();
+  clearInterval(beat);
+  stopAll();
+  stopCommands();
+  stopMembers();
   process.exit(0);
 }
 process.on('SIGINT', shutdown);

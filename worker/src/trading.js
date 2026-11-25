@@ -45,6 +45,18 @@ export async function paperSell({ member, symbol, quantity = null, reason, comma
   };
 }
 
+// 이 직원이 보유 중인 코인(모의·실전)의 현재가를 갱신한다. 사이트 현황 탭을 열 때 명령으로 온다.
+export async function refreshMemberPrices(member) {
+  const positions = (await listPositions(member.id)).filter((p) => Number(p.quantity) > 0);
+  if (positions.length === 0) return { message: '보유 중인 코인이 없어요.' };
+  const prices = new Map();
+  for (const p of positions) {
+    if (!prices.has(p.symbol)) prices.set(p.symbol, await fetchPrice(p.symbol));
+    await savePosition(member.id, p.mode, p.symbol, { lastPrice: prices.get(p.symbol) });
+  }
+  return { message: `현재가 갱신: ${[...prices].map(([s, v]) => `${s} ${v}`).join(', ')}` };
+}
+
 // 승인된 전략으로 한 번 확인하고, 조건이 맞으면 모의매매한다.
 export async function runStrategy(member, strategy, { commandId = null, trigger = '자동' } = {}) {
   const rules = strategy.rules;

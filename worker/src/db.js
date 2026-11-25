@@ -55,9 +55,18 @@ export async function getMember(id) {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
-export async function listTradingMembers() {
-  const snap = await getDocs(query(collection(db, COL.members), where('departmentId', '==', 'investment')));
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+// 투자운영사업부 직원 문서가 바뀔 때만 알림을 받는다. (처음 연결할 때 한 번 전체를 받는다)
+export function onTradingMembers(handler, onError) {
+  return onSnapshot(
+    query(collection(db, COL.members), where('departmentId', '==', 'investment')),
+    (snap) => handler(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    onError,
+  );
+}
+
+// 사이트에 '다음 자동 실행' 시각을 보여주기 위해 연결 상태 문서에 적어 둔다. (예약할 때만 쓴다)
+export function setNextRun(memberId, at) {
+  return setDoc(doc(db, COL.worker, 'status'), { nextRuns: { [memberId]: at } }, { merge: true });
 }
 
 export async function getApprovedStrategy(member) {
@@ -116,11 +125,6 @@ export function savePosition(memberId, mode, symbol, position) {
 export async function listPositions(memberId, mode) {
   const snap = await getDocs(query(collection(db, COL.positions), where('memberId', '==', memberId)));
   return snap.docs.map((d) => d.data()).filter((p) => !mode || p.mode === mode);
-}
-
-export async function listOpenPositions() {
-  const snap = await getDocs(collection(db, COL.positions));
-  return snap.docs.map((d) => d.data()).filter((p) => Number(p.quantity) > 0);
 }
 
 export async function addTrade(trade) {

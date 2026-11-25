@@ -1,24 +1,54 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatNumber, formatPct, formatTime, formatUsdt, pnlClass } from '../format';
 import { useApi } from '../passcode';
 
+const REFRESH_WAIT_MS = 4000; // 가격 갱신 명령 후 노트북이 처리할 시간을 잠깐 기다렸다가 다시 읽는다
+
 // 현황 탭: 수익률, 보유 코인, 매매 내역 (노트북 매매 프로그램이 기록한 값)
+// 탭을 열 때만 노트북에 '현재가 갱신' 명령을 한 번 보낸다. (노트북이 주기적으로 갱신하지 않는다)
 export default function StatusTab({ member }) {
   const api = useApi();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const asked = useRef(false);
 
   const load = useCallback(() => {
     return api(`/api/members/${member.id}/portfolio`)
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        return d;
+      })
       .catch((err) => setError(err.message));
   }, [api, member.id]);
 
+  const refreshPrices = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await api(`/api/members/${member.id}/commands`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'refresh_prices' }),
+      });
+      await new Promise((r) => setTimeout(r, REFRESH_WAIT_MS));
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [api, member.id, load]);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    load().then((d) => {
+      const hasOpen = d?.positions?.some((p) => Number(p.quantity) > 0);
+      if (d?.workerOnline && hasOpen && !asked.current) {
+        asked.current = true;
+        refreshPrices();
+      }
+    });
+  }, [load, refreshPrices]);
 
   if (!data) {
     return error ? <p className="msg error">{error}</p> : <p className="hint">불러오는 중…</p>;
@@ -35,10 +65,15 @@ export default function StatusTab({ member }) {
       <section className="panel">
         <div className="section-head">
           <h2>보유 중 {open.length}개</h2>
-          <button type="button" className="link-btn" onClick={load}>
-            새로고침
-          </button>
+          {data.workerOnline && open.length > 0 && (
+            <button type="button" className="link-btn" onClick={refreshPrices} disabled={refreshing}>
+              {refreshing ? '현재가 갱신 중…' : '현재가 갱신'}
+            </button>
+          )}
         </div>
+        {!data.workerOnline && open.length > 0 && (
+          <p className="hint">노트북 프로그램이 꺼져 있어서 현재가는 마지막으로 갱신된 값이에요.</p>
+        )}
         {open.length === 0 ? (
           <p className="hint">보유 중인 코인이 없어요.</p>
         ) : (

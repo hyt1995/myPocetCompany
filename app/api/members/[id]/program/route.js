@@ -16,8 +16,10 @@ export const GET = guarded(async (request, { id }) => {
     program: {
       mode: member.mode,
       autoRun: member.autoRun,
+      schedule: member.schedule,
       paperCapitalUsdt: member.paperCapitalUsdt,
       activeStrategyVersion: member.activeStrategyVersion,
+      nextRunAt: worker.nextRuns?.[id] || null, // 노트북 프로그램이 예약한 다음 자동 실행
     },
     strategy: strategy
       ? { version: strategy.version, name: strategy.name, summary: strategy.summary, rules: strategy.rules }

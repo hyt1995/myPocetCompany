@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { describeSchedule } from '../../lib/schedule';
 import { COMMAND_LABELS, COMMAND_STATUS_LABELS, formatTime } from '../format';
 import { useApi } from '../passcode';
 
@@ -68,7 +69,17 @@ export default function ProgramTab({ member, onMemberChanged }) {
         )}
       </section>
 
-      <ProgramSettings member={member} program={data.program} api={api} onSaved={onMemberChanged} />
+      <ProgramSettings
+        member={member}
+        program={data.program}
+        strategyEvery={rules?.checkEveryMinutes}
+        workerOnline={Boolean(data.worker?.online)}
+        api={api}
+        onSaved={(m) => {
+          onMemberChanged(m);
+          load();
+        }}
+      />
 
       <section className="panel">
         <h2>지금 실행</h2>
@@ -149,19 +160,27 @@ export default function ProgramTab({ member, onMemberChanged }) {
   );
 }
 
-function ProgramSettings({ member, program, api, onSaved }) {
-  const [form, setForm] = useState({
+function ProgramSettings({ member, program, strategyEvery, workerOnline, api, onSaved }) {
+  const initial = () => ({
     mode: program.mode,
     autoRun: program.autoRun,
-    paperCapitalUsdt: program.paperCapitalUsdt,
+    paperCapitalUsdt: String(program.paperCapitalUsdt),
+    scheduleType: program.schedule?.type || 'strategy',
+    minutes: String(program.schedule?.minutes || 60),
+    times: (program.schedule?.times || ['09:00', '21:00']).join(', '),
   });
+  const [form, setForm] = useState(initial);
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const changed =
-    form.mode !== program.mode ||
-    form.autoRun !== program.autoRun ||
-    Number(form.paperCapitalUsdt) !== program.paperCapitalUsdt;
+  const schedule =
+    form.scheduleType === 'interval'
+      ? { type: 'interval', minutes: Number(form.minutes) }
+      : form.scheduleType === 'times'
+        ? { type: 'times', times: form.times }
+        : { type: 'strategy' };
+  const base = initial();
+  const changed = Object.keys(base).some((k) => String(form[k]) !== String(base[k]));
 
   async function save(e) {
     e.preventDefault();
@@ -170,13 +189,15 @@ function ProgramSettings({ member, program, api, onSaved }) {
     try {
       const d = await api(`/api/members/${member.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...form, paperCapitalUsdt: Number(form.paperCapitalUsdt) }),
+        body: JSON.stringify({
+          mode: form.mode,
+          autoRun: form.autoRun,
+          paperCapitalUsdt: Number(form.paperCapitalUsdt),
+          schedule,
+        }),
       });
       onSaved(d.member);
-      program.mode = d.member.mode;
-      program.autoRun = d.member.autoRun;
-      program.paperCapitalUsdt = d.member.paperCapitalUsdt;
-      setNotice(`저장됨 · ${formatTime(Date.now())}`);
+      setNotice(`저장됨 · ${formatTime(Date.now())}${workerOnline ? ' · 노트북 프로그램이 바로 반영해요' : ''}`);
     } catch (err) {
       setNotice(err.message);
     } finally {
@@ -184,13 +205,23 @@ function ProgramSettings({ member, program, api, onSaved }) {
     }
   }
 
+  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
+  const active = program.mode === 'paper' && program.autoRun && program.activeStrategyVersion;
+
   return (
     <section className="panel">
       <h2>프로그램 설정</h2>
+      <p className="hint">
+        {active
+          ? `자동 실행 중 · ${describeSchedule(program.schedule, strategyEvery)}${
+              program.nextRunAt && workerOnline ? ` · 다음 ${formatTime(program.nextRunAt)}` : ''
+            }`
+          : '자동 실행 꺼짐 (모드 \'모의\' + 자동 실행 켬 + 승인된 전략이 있어야 돌아가요)'}
+      </p>
       <form onSubmit={save} className="ask">
         <label>
           모드
-          <select value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
+          <select value={form.mode} onChange={set('mode')}>
             <option value="stopped">정지</option>
             <option value="paper">모의매매</option>
           </select>
@@ -201,19 +232,36 @@ function ProgramSettings({ member, program, api, onSaved }) {
             checked={form.autoRun}
             onChange={(e) => setForm({ ...form, autoRun: e.target.checked })}
           />
-          자동 실행 (전략의 확인 주기마다 노트북 프로그램이 알아서 실행)
+          자동 실행 (아래 스케줄대로 노트북 프로그램이 알아서 실행)
         </label>
         <label>
-          모의 시작 자금 (USDT)
-          <input
-            type="number"
-            inputMode="decimal"
-            min="1"
-            value={form.paperCapitalUsdt}
-            onChange={(e) => setForm({ ...form, paperCapitalUsdt: e.target.value })}
-          />
+          스케줄
+          <select value={form.scheduleType} onChange={set('scheduleType')}>
+            <option value="strategy">전략 기본 주기{strategyEvery ? ` (${strategyEvery}분마다)` : ''}</option>
+            <option value="interval">N분마다</option>
+            <option value="times">매일 정해진 시각</option>
+          </select>
         </label>
-        <p className="hint">자동 실행은 모의매매만 해요. 실제 돈은 아래 [실제 매수/매도] 버튼으로만 움직여요.</p>
+        {form.scheduleType === 'interval' && (
+          <label>
+            몇 분마다 (1~1440, 한국 시간 정각 기준으로 맞춰요)
+            <input type="number" inputMode="numeric" min="1" max="1440" value={form.minutes} onChange={set('minutes')} />
+          </label>
+        )}
+        {form.scheduleType === 'times' && (
+          <label>
+            시각 (한국 시간, 쉼표로 구분)
+            <input value={form.times} onChange={set('times')} placeholder="09:00, 21:00" />
+          </label>
+        )}
+        <label>
+          모의 시작 자금 (USDT)
+          <input type="number" inputMode="decimal" min="1" value={form.paperCapitalUsdt} onChange={set('paperCapitalUsdt')} />
+        </label>
+        <p className="hint">
+          자동 실행은 모의매매만 해요. 실제 돈은 아래 [실제 매수/매도] 버튼이나 채팅 확인 카드로만 움직여요.
+          채팅에서 "스케줄 1시간마다로 바꿔"라고 해도 돼요.
+        </p>
         <button type="submit" disabled={saving || !changed}>
           {saving ? '저장 중…' : '설정 저장'}
         </button>

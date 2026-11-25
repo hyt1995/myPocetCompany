@@ -38,10 +38,7 @@ export const config = {
   },
 
   paperFeeRate: num('PAPER_FEE_RATE', 0.001), // 0.1%
-  heartbeatMs: 30_000,
-  tickMs: 30_000, // 자동 실행 확인 주기
-  priceRefreshMs: 60_000, // 보유 코인 현재가 갱신 주기
-  memberRefreshMs: 60_000, // 직원·전략 다시 읽는 주기
+  heartbeatMs: 5 * 60_000, // 연결 신호 5분마다 (사이트는 12분 안에 신호가 있으면 '연결됨')
 };
 
 export function checkConfig() {

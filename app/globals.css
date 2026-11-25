@@ -791,6 +791,44 @@ body {
   font-weight: 600;
 }
 
+/* ---- 채팅 확인 카드 ---- */
+
+.chat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.proposal {
+  align-self: flex-start;
+  width: 88%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 14px;
+}
+
+.proposal.live {
+  border-color: #e3b4ad;
+}
+
+.proposal.executed {
+  border-color: #2e9e5b;
+}
+
+.proposal.cancelled,
+.proposal.invalid {
+  opacity: 0.7;
+}
+
+.proposal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .empty {
   margin-top: 20px;
   color: var(--muted);
