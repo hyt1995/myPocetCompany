@@ -2,6 +2,7 @@
 
 AI 부서들이 일하고, 사장님은 폰으로 확인·지시하는 1인 회사 운영 사이트.
 지금은 사장님 혼자 쓴다. 수익이 나면 나중에 제품화한다.
+기획서·결정·당부·남은 일 전체 흐름은 `docs/HANDOFF.md` (새 채팅은 먼저 읽는다).
 
 ## 스택
 - Next.js (App Router, JavaScript) on Vercel. GitHub `main`에 push하면 실제 사이트에 자동 배포.
