@@ -1,5 +1,6 @@
 // 모의매매 실행과 전략 실행. (실전 주문은 commands.js → live.js)
 
+import { validateRules } from './capabilities.js';
 import { config } from './config.js';
 import { addTrade, listPositions, savePosition } from './db.js';
 import { fetchCandles, fetchPrice } from './market.js';
@@ -58,8 +59,13 @@ export async function refreshMemberPrices(member) {
 }
 
 // 승인된 전략으로 한 번 확인하고, 조건이 맞으면 모의매매한다.
+// 규칙이 capabilities.js 검사를 통과하지 못하면 아무것도 사고팔지 않는다.
 export async function runStrategy(member, strategy, { commandId = null, trigger = '자동' } = {}) {
   const rules = strategy.rules;
+  const errors = validateRules(rules);
+  if (errors.length) {
+    throw new Error(`v${strategy.version} 전략이 프로그램 규칙 검사를 통과하지 못해 실행하지 않았어요: ${errors.join(' / ')}`);
+  }
   const tfMs = TIMEFRAME_MS[rules.timeframe];
   const maxOpen = Number(rules.position?.maxOpenPositions) || 1;
   const messages = [];

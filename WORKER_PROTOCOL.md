@@ -75,13 +75,28 @@
 
 | indicator | params | 의미 |
 | --- | --- | --- |
-| `price` | 없음 | 현재가 (마지막 봉 종가) |
+| `price` | 없음 | 마지막 완성 봉 종가 |
 | `price_change_pct` | `lookbackBars` | N봉 전 종가 대비 변화율 % |
 | `sma` / `ema` | `period` | 이동평균 |
 | `rsi` | `period` | RSI (0~100) |
 | `volume_change_pct` | `lookbackBars` | 마지막 봉 거래량의 직전 N봉 평균 대비 변화율 % |
 | `bollinger_pct_b` | `period`, `stdDev` | %B (0 = 하단, 1 = 상단) |
 | `macd_hist` | `fast`, `slow`, `signal` | MACD 히스토그램 |
+
+### 할 수 있는 일의 정의 = `capabilities.js` (사이트 `lib/` = 노트북 `worker/src/`, 같은 파일)
+
+지표 목록, 파라미터 범위·기본값, 숫자 범위, 프로그램 동작 방식, **못 하는 일 목록**은 전부 `capabilities.js` 한 곳에 있다.
+이 표 하나에서 아래 셋이 만들어진다.
+
+1. `capabilityGuide()` — 전략 AI가 받는 설명. AI는 이것을 보고 요청이 실행 가능한지 판단한다.
+2. `validateRules()` — **엄격한 검사.** 표에 없는 항목(예: `rank`, `trailingStopPct`)이 하나라도 있거나, 정수 자리에 소수, 범위 밖 숫자, 단위가 다른 지표끼리 비교하면 실패.
+   사이트는 승인할 때, 노트북은 **실행할 때마다** 검사한다. 실패하면 노트북은 아무것도 사고팔지 않는다.
+3. `describeRules()` — 화면의 "프로그램이 실제로 하는 일". AI가 쓴 `description` 이 아니라 규칙에서 바로 만든다. 노트북 로그의 조건 이름도 같다.
+
+전략 문서에는 판정 결과도 저장한다: `feasibility` (`ok` | `partial` | `impossible`), `unsupported[{request, reason, alternative}]`,
+`assumptions[{item, value, why}]`, `suggestedSchedule`, `capabilitiesVersion`.
+`ok` 가 아니면 `status: 'not_executable'`, `rules: null` 로 저장하고 승인할 수 없다. (AI가 비슷한 것으로 바꿔 넣지 못하게)
+`capabilitiesVersion` 이 없는 예전 초안도 승인할 수 없다.
 
 - 청산: `stopLossPct`(필수), `takeProfitPct`, `maxHoldHours` 중 하나라도 도달하거나, `exit.conditions` 가 `exit.logic` 대로 만족하면 매도.
 - 조건은 **마지막 완성된 봉** 기준으로 판단한다 (지금 만들어지는 봉은 제외). 손절·익절은 지금 가격 기준.

@@ -1,9 +1,12 @@
 // 지표 계산 (외부 라이브러리 없음).
+// 지표 목록·기본값은 capabilities.js 에서 정한다.
 // 모든 함수는 캔들 배열과 같은 길이의 배열을 돌려준다. 값을 못 구하는 자리는 null.
 // 캔들: { time, open, high, low, close, volume }
 //
 // RSI 는 기존 파이썬 봇(GetRSI)과 같은 값이 나오게 pandas
 // ewm(com=period-1, min_periods=period, adjust=True) 방식을 그대로 옮겼다.
+
+import { effectiveParams, INDICATORS } from './capabilities.js';
 
 export function sma(values, period) {
   const out = new Array(values.length).fill(null);
@@ -111,9 +114,11 @@ export function macdHist(closes, fast, slow, signal) {
 // 전략 규칙의 { indicator, params } 를 계산한다.
 export function series(candles, spec) {
   const closes = candles.map((c) => c.close);
-  const p = spec.params || {};
-  const n = (key, fallback) => {
-    const v = Number(p[key] ?? fallback);
+  const def = INDICATORS[spec.indicator];
+  if (!def) throw new Error(`지원하지 않는 지표: ${spec.indicator}`);
+  const p = effectiveParams(spec); // 빠진 값은 capabilities.js 의 기본값
+  const n = (key) => {
+    const v = Number(p[key]);
     if (!Number.isFinite(v) || v <= 0) throw new Error(`${spec.indicator}: ${key} 값이 올바르지 않아요.`);
     return v;
   };
@@ -121,19 +126,19 @@ export function series(candles, spec) {
     case 'price':
       return closes;
     case 'price_change_pct':
-      return priceChangePct(closes, Math.round(n('lookbackBars', 1)));
+      return priceChangePct(closes, n('lookbackBars'));
     case 'sma':
-      return sma(closes, Math.round(n('period')));
+      return sma(closes, n('period'));
     case 'ema':
-      return ema(closes, Math.round(n('period')));
+      return ema(closes, n('period'));
     case 'rsi':
-      return rsi(closes, Math.round(n('period', 14)));
+      return rsi(closes, n('period'));
     case 'volume_change_pct':
-      return volumeChangePct(candles.map((c) => c.volume), Math.round(n('lookbackBars', 20)));
+      return volumeChangePct(candles.map((c) => c.volume), n('lookbackBars'));
     case 'bollinger_pct_b':
-      return bollingerPctB(closes, Math.round(n('period', 20)), n('stdDev', 2));
+      return bollingerPctB(closes, n('period'), n('stdDev'));
     case 'macd_hist':
-      return macdHist(closes, Math.round(n('fast', 12)), Math.round(n('slow', 26)), Math.round(n('signal', 9)));
+      return macdHist(closes, n('fast'), n('slow'), n('signal'));
     default:
       throw new Error(`지원하지 않는 지표: ${spec.indicator}`);
   }

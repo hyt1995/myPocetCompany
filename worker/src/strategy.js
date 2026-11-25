@@ -3,6 +3,7 @@
 // 판단 기준 봉: 마지막 '완성된' 봉. 지금 만들어지고 있는 봉은 쓰지 않는다.
 //   → 같은 봉 안에서는 몇 번을 확인해도 같은 결과가 나온다.
 
+import { conditionText } from './capabilities.js';
 import { series } from './indicators.js';
 
 // 거래소 캔들에서 아직 안 끝난 마지막 봉을 뺀다.
@@ -37,7 +38,7 @@ export function checkCondition(candles, cond, cache = new Map()) {
 
   const l0 = left[t];
   const r0 = r(t);
-  const label = cond.description || `${cond.indicator} ${cond.op}`;
+  const label = conditionText(cond); // AI가 쓴 description 이 아니라 규칙 그대로
   if (l0 == null || r0 == null) {
     return { ok: false, label, detail: '데이터 부족' };
   }

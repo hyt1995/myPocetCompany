@@ -840,3 +840,56 @@ body {
   font-size: 12px;
   text-align: center;
 }
+
+/* 전략 탭: 실행 가능 여부 */
+.chip-bad {
+  background: #fbe9e6;
+  color: #c0392b;
+}
+
+.strategy.not_executable {
+  border-color: #e3b4ad;
+}
+
+.unsupported li {
+  margin-top: 8px;
+  color: inherit;
+}
+
+.link-button {
+  margin-left: 4px;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.plan {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.plan .sub {
+  margin-top: 0;
+}
+
+.plan-section {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.plan-section ul,
+.caps ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.caps {
+  margin-top: 12px;
+  font-size: 13px;
+}
