@@ -48,13 +48,26 @@ AI 부서들이 일하고, 사장님은 폰으로 확인·지시하는 1인 회�
   - `strategies/v{n}` — 전략 버전 (draft → approved, 이전 approved 는 archived). `rules` 형식은 WORKER_PROTOCOL.md
 - `mpc_commands` — 사이트 → 매매 프로그램 명령, `mpc_trades` / `mpc_positions` / `mpc_worker` — 매매 프로그램이 씀
 - 부서의 기본 직원은 `lib/departments.js`의 `defaultMembers`로 처음 열 때 생성된다.
+- 마케팅사업부: `mpc_mkt_members` (직원), `mpc_mkt_settings/department` (부서 공통 지침) — `marketing/` 모듈만 쓴다
 
 ## 부서
 - 비서 (`/dept/secretary`): 일정(구글 캘린더), API 크레딧·토큰 비용, 매출·비용·순수익 보고. 지침 편집 가능.
-- 마케팅사업부: 인스타·쓰레드 자동 운영과 기획, 재택업무 수익모델 탐색·개발. (준비 중)
+- 마케팅사업부 (`/dept/marketing`): **별도 모듈 `marketing/`** (아래 '마케팅사업부 모듈' 참고).
+  팀: 직원1 데이터 분석가 · 직원2 사업 기획자 · 팀장(부장), 감사는 사장님. 시장조사 → 회의 → 사업 계획서 → 사장님 승인. (회의실 준비 중)
 - 투자운영사업부 (`/dept/investment`): **매매 방법 1개 = 직원 1명 = 매매 프로그램 1개.** 바이낸스 현물.
   직원 화면 탭: 학습(사진·URL·글) → 전략(버전·승인) → 프로그램(모드, 지금 실행, 모의/실제 매매) → 현황(수익률·보유·내역) → 대화·지침.
   부서 화면: 직원 목록(모의 수익률 순), [+ 직원 추가], 부서 공통 지침, 노트북 연결 상태.
+
+## 마케팅사업부 모듈 (분리)
+- 마케팅사업부의 화면·API·데이터·지침은 전부 `marketing/` 폴더에 있다. 자세한 구조는 `marketing/README.md`.
+- **다른 기능을 고칠 때 `marketing/` 은 건드리지 않는다. 마케팅을 고칠 때는 `marketing/` 안에서만 고친다.**
+- 공용 코드는 `marketing/core/server.js`·`client.js` 로만 가져온다. 공용 코드 사용법이 바뀌면 이 두 파일만 고친다.
+- 공용 코드가 마케팅 코드를 가져오는 곳은 `lib/departments.js` → `marketing/department.js` 하나뿐 (조직도 등록).
+  부서 정보의 `ownModule: true` → 공용 직원 코드(`lib/members.js`, `/api/departments`, `/api/members`, `app/dept/[id]`)는 이 부서를 다루지 않는다.
+- Next.js 위치(`app/dept/marketing/`, `app/api/marketing/`)에는 연결선 한 줄짜리 파일만 둔다.
+- 컬렉션은 `mpc_mkt_` 접두사 (`marketing/server/collections.js`). 공용 `COL` 에 넣지 않는다.
+- 경계 검사 `scripts/check-marketing-boundary.mjs` 가 `npm run build` 전(prebuild)에 돈다. 어기면 배포되지 않는다.
+- 테스트: `npm run test:marketing`
 
 ## 다음 할 일
 - 노트북에 worker 설치·실행 (worker/README.md) → 모의매매 확인 → 테스트넷 → 소액 실전

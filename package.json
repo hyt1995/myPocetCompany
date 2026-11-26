@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/check-marketing-boundary.mjs",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check:marketing": "node scripts/check-marketing-boundary.mjs",
+    "test:marketing": "node --test marketing/test/*.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.0.0",
