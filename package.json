@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/check-marketing-boundary.mjs",
+    "prebuild": "node scripts/check-module-boundaries.mjs",
     "build": "next build",
     "start": "next start",
-    "check:marketing": "node scripts/check-marketing-boundary.mjs",
-    "test:marketing": "node --test marketing/test/*.test.mjs"
+    "check:modules": "node scripts/check-module-boundaries.mjs",
+    "test:marketing": "node --test marketing/test/*.test.mjs",
+    "test:research": "node --test research/test/*.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.0.0",

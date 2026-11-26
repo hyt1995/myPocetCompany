@@ -9,7 +9,7 @@
 | `team.js` | 팀 구성(직원1 데이터 분석가·직원2 사업 기획자·팀장)과 기본 지침, 부서 공통 지침(회의 규칙). 감사는 사장님 |
 | `department.js` | 조직도에 보이는 부서 정보. 공용 코드(`lib/departments.js`)가 가져가는 유일한 파일 |
 | `core/server.js`, `core/client.js` | **공용 코드와의 연결선.** 공용 함수(callClaude, guarded, requireDb, useApi …)는 여기로만 가져온다 |
-| `server/` | Firestore 저장·읽기. 컬렉션은 `mpc_mkt_` 로 시작 (`server/collections.js`) |
+| `server/` | Firestore 저장·읽기. 컬렉션은 `mpc_mkt_` 로 시작 (`server/collections.js`). `research.js` = 시장조사 안건 |
 | `api/` | API 처리 함수 |
 | `ui/` | 화면 |
 | `test/` | 순수 로직 테스트 (`npm run test:marketing`) |
@@ -18,10 +18,12 @@ Next.js 가 정해 둔 위치에는 **연결선 한 줄짜리 파일**만 있다
 - `app/dept/marketing/page.jsx` → `marketing/ui/DepartmentPage.jsx`
 - `app/api/marketing/team/route.js` → `marketing/api/team.js`
 - `app/api/marketing/members/[memberId]/route.js` → `marketing/api/member.js`
+- `app/api/marketing/research/...` → `marketing/api/research.js`
 
 ## 경계 규칙 (빌드 전에 자동 검사)
-`scripts/check-marketing-boundary.mjs` 가 `npm run build` 전에 돈다. 어기면 빌드가 실패해서 배포되지 않는다.
-1. `marketing/` 안의 파일은 `marketing/` 안의 파일만 가져온다. 공용 코드는 `marketing/core/` 로만 가져온다.
+`scripts/check-module-boundaries.mjs` 가 `npm run build` 전에 돈다. 어기면 빌드가 실패해서 배포되지 않는다.
+1. `marketing/` 안의 파일은 `marketing/` 안의 파일만 가져온다. 공용 코드와 시장조사 프로그램은 `marketing/core/` 로만 가져온다.
+   시장조사 프로그램은 공개 입구(`research/index.js`, `research/client.js`)만 쓸 수 있다.
 2. 공용 코드(lib/, components/, app/ 의 다른 곳)는 마케팅 코드를 가져오지 않는다. 예외: `lib/departments.js` → `marketing/department.js`.
 3. 연결선 파일은 `marketing/` 안의 파일만 가져온다.
 
@@ -31,6 +33,12 @@ Next.js 가 정해 둔 위치에는 **연결선 한 줄짜리 파일**만 있다
 ## 데이터 (Firestore)
 - `mpc_mkt_members/{memberId}` — 직원 (title, name, role, model, systemPrompt, order). 처음 열 때 `team.js` 로 만든다
 - `mpc_mkt_settings/department` — 부서 공통 지침 (없으면 기본 회의 규칙을 보여 준다)
+- `mpc_mkt_research/{agendaId}` — 시장조사 안건: topic, candidates, status(draft → researching → reported), runId(→ `mpc_rsh_runs`), report
+
+## 시장조사 (회의 ①·②)
+1. 사장님이 주제 입력 → 데이터 분석가가 후보 키워드 50개 (Haiku 1번, `purpose: research-plan`)
+2. 사장님이 후보를 고치고 [조사 시작] → 시장조사 프로그램(`research/`)이 네이버 숫자를 잰다 (AI 없음)
+3. [보고서 받기] → 데이터 분석가가 프로그램 표(상위 40개)만 보고 보고서 (직원 모델 등급 1번, `purpose: research-report`)
 
 ## 다음 단계
-시장조사 프로그램(네이버 API) → 회의실(안건 → 데이터 분석가 → 사업 기획자 → 팀장 → 사장님 승인) → 사업 장부·회고
+회의실(보고서 → 사업 기획자 → 팀장 → 사장님 승인) → 사업 장부·회고

@@ -1,9 +1,10 @@
 'use client';
 
-// 마케팅사업부 부서 화면: 팀 구성(직원1·직원2·팀장 + 감사), 회의실(준비 중), 부서 공통 지침(회의 규칙).
+// 마케팅사업부 부서 화면: 팀 구성(직원1·직원2·팀장 + 감사), 시장조사, 회의실(준비 중), 부서 공통 지침(회의 규칙).
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatTime, useApi } from '../core/client';
+import MarketResearch from './MarketResearch';
 
 const MODEL_LABELS = { cheap: '가성비 (Haiku)', smart: '고성능 (Sonnet)' };
 
@@ -65,11 +66,13 @@ export default function MarketingDepartment() {
         </div>
       </section>
 
+      <MarketResearch />
+
       <section className="panel">
         <h2>회의실</h2>
         <p className="hint">
-          준비 중이에요. 시장조사 프로그램이 생기면 여기서 안건을 올리고, 데이터 분석가 → 사업 기획자 → 팀장
-          순서로 회의한 뒤 사장님이 사업 계획서를 승인해요.
+          준비 중이에요. 시장조사 보고서가 나오면 여기서 사업 기획자 → 팀장 순서로 회의하고, 사장님(감사)이 사업
+          계획서를 승인해요.
         </p>
       </section>
 

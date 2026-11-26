@@ -3,3 +3,6 @@
 
 export { PasscodeGate, useApi } from '../../components/passcode';
 export { formatTime } from '../../components/format';
+
+// 시장조사 프로그램 (research/ 모듈) 화면 부품 — 공개 입구만 쓴다.
+export { ResearchProgress, ResearchTable, useResearchRunner } from '../../research/client.js';
