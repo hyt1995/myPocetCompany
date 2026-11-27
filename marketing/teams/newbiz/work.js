@@ -90,7 +90,7 @@ async function collect(week, step, members, body) {
 
   const sources = numberSources(r.sources, step.prefix, r.content);
   if (!sources.length) {
-    throw httpError(502, '웹 검색 결과가 하나도 없어요. Claude Console 에서 웹 검색이 켜져 있는지 확인해 주세요.');
+    throw httpError(502, '웹 검색 결과가 하나도 없어요. 다시 해 보고, 계속 없으면 platform.claude.com/settings/capabilities 에서 웹 검색이 켜져 있는지 확인해 주세요.');
   }
   return {
     status: 'collected',
