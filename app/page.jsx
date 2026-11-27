@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import OrgChart from '../components/OrgChart';
 import { departments } from '../lib/departments';
 
@@ -24,6 +25,10 @@ export default function Home() {
       </header>
 
       <OrgChart departments={departments} />
+
+      <Link href="/board" className="enter">
+        회사 게시판 (부서 보고서) →
+      </Link>
 
       <footer className="foot">
         배포 버전 {version} · {builtAt}

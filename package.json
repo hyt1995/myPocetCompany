@@ -9,7 +9,8 @@
     "start": "next start",
     "check:modules": "node scripts/check-module-boundaries.mjs",
     "test:marketing": "node --test marketing/test/*.test.mjs",
-    "test:research": "node --test research/test/*.test.mjs"
+    "test:research": "node --test research/test/*.test.mjs",
+    "test:board": "node --test board/test/*.test.mjs"
   },
   "dependencies": {
     "firebase": "^11.0.0",

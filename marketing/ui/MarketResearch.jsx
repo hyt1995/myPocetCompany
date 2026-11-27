@@ -52,7 +52,7 @@ export default function MarketResearch() {
   return (
     <section className="panel">
       <div className="section-head">
-        <h2>시장조사</h2>
+        <h2>키워드 조사 (네이버 숫자)</h2>
         <Link href="/research" className="hint">
           프로그램·키 상태 →
         </Link>

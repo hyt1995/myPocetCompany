@@ -1,7 +1,7 @@
 // 모듈 경계 검사. `npm run build` 전에 자동으로 돈다 (package.json 의 prebuild).
 // 규칙을 어기면 빌드가 실패해서 Vercel 에 배포되지 않는다.
 //
-// 모듈: marketing/ (마케팅사업부), research/ (시장조사 프로그램)
+// 모듈: marketing/ (마케팅사업부), research/ (시장조사 프로그램), board/ (회사 게시판)
 //
 // 규칙
 // 1. 모듈 안의 파일은 자기 모듈 안의 파일만 가져온다. (npm 패키지·node 내장은 괜찮다)
@@ -32,6 +32,12 @@ const MODULES = [
     label: '시장조사 프로그램',
     wires: ['app/research', 'app/api/research'],
     entries: ['research/index.js', 'research/client.js'],
+  },
+  {
+    dir: 'board',
+    label: '회사 게시판',
+    wires: ['app/board', 'app/api/board'],
+    entries: ['board/index.js', 'board/client.js'],
   },
 ];
 const ALLOWED_SHARED_IMPORTS = [{ from: 'lib/departments.js', to: 'marketing/department.js' }];

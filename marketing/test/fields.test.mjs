@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { cleanMemberPatch, MAX_PROMPT_CHARS, toMember } from '../server/fields.js';
 import { findSeed, TEAM } from '../team.js';
+import { findTeam } from '../org.js';
 
 test('직원 수정은 이름·역할·모델·지침만 받고 모르는 항목은 버린다', () => {
   const patch = cleanMemberPatch({ name: '  분석가 ', model: 'smart', order: 1, departmentId: 'investment', foo: 1 });
@@ -20,13 +21,14 @@ test('빈 이름은 "이름 없음"으로 저장된다', () => {
   assert.equal(cleanMemberPatch({ name: '   ' }).name, '이름 없음');
 });
 
-test('팀은 직원1·직원2·팀장 3명이고 id 가 mkt- 로 시작한다', () => {
+test('신사업팀은 팀원1·팀원2·팀장 3명이고 id 가 mkt- 로 시작한다', () => {
   assert.deepEqual(
     TEAM.map((m) => m.title),
-    ['직원1', '직원2', '팀장'],
+    ['팀원1', '팀원2', '팀장'],
   );
   for (const m of TEAM) {
     assert.ok(m.id.startsWith('mkt-'));
+    assert.ok(findTeam(m.teamId), `${m.id} 의 팀이 marketing/org.js 에 없다`);
     assert.ok(m.systemPrompt.length > 100);
   }
 });

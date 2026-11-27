@@ -9,7 +9,9 @@ AI 부서들이 일하고, 사장님은 폰으로 확인·지시하는 1인 회�
   사장님 혼자 쓰는 단계라 규칙은 열어 둠(`firestore.rules`). 다른 사람이 쓰기 전에 반드시 닫는다.
   이 사이트의 컬렉션은 전부 `mpc_` 접두사 (focus-app 데이터와 안 섞이게). 목록은 `lib/firebase.js`의 `COL`.
 - AI: Claude API. 호출은 반드시 `lib/claude.js`의 `callClaude()` 하나만 거친다.
-  (호출마다 비용을 `mpc_ai_calls`에 기록. 나중에 비용 한도·킬 스위치도 여기에 넣는다.)
+  호출마다 비용을 `mpc_ai_calls`에 기록하고, 하루 합계를 `mpc_ai_budget/{한국 날짜}`에 더한다.
+  **킬 스위치:** 하루 합계가 `AI_DAILY_LIMIT_USD`(기본 $2)를 넘으면 모든 AI 호출을 막는다(429). 0 이면 전부 멈춤.
+  웹 검색은 `webSearchTool({ maxUses })` 로 붙인다 (검색 1번 $0.01, 단가는 `lib/pricing.js`). 출처는 `sources` 로 돌려준다.
 - 매매 프로그램: `worker/` (Node.js, ccxt + Firebase 웹 SDK). **사장님 노트북(Ubuntu 20.04)**에서 pm2로 돌아간다.
   사이트와는 Firestore로만 주고받는다. 규격은 `WORKER_PROTOCOL.md` — 규격을 바꾸면 문서, 사이트 `lib/`, `worker/src/`를 같이 고친다.
   기존 파이썬 봇(선물·레버리지·물타기)은 쓰지 않고 새로 만들었다. RSI·이동평균 계산은 기존 GetRSI/GetMA와 같은 값 (테스트로 확인).
@@ -28,6 +30,8 @@ AI 부서들이 일하고, 사장님은 폰으로 확인·지시하는 1인 회�
 - `ANTHROPIC_API_KEY` — Claude API 키
 - `APP_PASSCODE` — 로그인 대신 쓰는 비밀번호. 비용이 들거나 데이터를 바꾸는 API는 전부 확인
 - `FIREBASE_API_KEY`, `FIREBASE_APPID` — Firebase 웹 설정 (프로젝트 ID 기본값 `focus-app-76679`, `FIREBASE_PROJECT_ID`로 변경 가능)
+- `AI_DAILY_LIMIT_USD` — 하루 AI 비용 한도(달러). 없으면 2. `0` 이면 모든 AI 호출 중지 (킬 스위치)
+- `CRON_SECRET` — Vercel Cron 보호용 임의 문자열. 없으면 월요일 자동 브리핑이 돌지 않는다 (화면 버튼으로는 가능)
 - `COMMAND_SIGNING_SECRET` — 실전 주문 명령 서명키. 노트북 `.env`와 같은 값. 없으면 실제 매수/매도 버튼이 꺼짐
 - 시장조사 프로그램(`research/`): `NAVER_SEARCHAD_CUSTOMER_ID`, `NAVER_SEARCHAD_ACCESS_LICENSE`, `NAVER_SEARCHAD_SECRET_KEY` (네이버 검색광고 → 도구 → API 사용 관리),
   `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` (NAVER API HUB, 네이버 클라우드 콘솔. 2026-07-31 이후 새 키는 HUB 에서만 발급).
@@ -51,34 +55,45 @@ AI 부서들이 일하고, 사장님은 폰으로 확인·지시하는 1인 회�
   - `strategies/v{n}` — 전략 버전 (draft → approved, 이전 approved 는 archived). `rules` 형식은 WORKER_PROTOCOL.md
 - `mpc_commands` — 사이트 → 매매 프로그램 명령, `mpc_trades` / `mpc_positions` / `mpc_worker` — 매매 프로그램이 씀
 - 부서의 기본 직원은 `lib/departments.js`의 `defaultMembers`로 처음 열 때 생성된다.
-- 마케팅사업부: `mpc_mkt_members` (직원), `mpc_mkt_settings/department` (부서 공통 지침), `mpc_mkt_research` (시장조사 안건) — `marketing/` 모듈만 쓴다
+- 마케팅사업부: `mpc_mkt_members` (직원, teamId), `mpc_mkt_settings/department` (부서 공통 지침), `mpc_mkt_research` (키워드 조사 안건),
+  `mpc_mkt_work/{팀}_{주}` (팀 주간 업무, 예: newbiz_2026-W48) — `marketing/` 모듈만 쓴다
+- 회사 게시판: `mpc_board_posts` (부서 보고서, 같은 id 면 덮어씀) — `board/` 모듈만 쓴다. 다른 모듈은 `publishPost()` 로만 쓴다
+- AI 비용: `mpc_ai_calls` (호출 기록), `mpc_ai_budget/{YYYY-MM-DD}` (하루 합계, 킬 스위치) — `lib/claude.js` 만 쓴다
 - 시장조사 프로그램: `mpc_rsh_runs` (조사 1번 = 문서 1개: 키워드·결과 rows·진행 cursor) — `research/` 모듈만 쓴다
 
 ## 부서
 - 비서 (`/dept/secretary`): 일정(구글 캘린더), API 크레딧·토큰 비용, 매출·비용·순수익 보고. 지침 편집 가능.
-- 마케팅사업부 (`/dept/marketing`): **별도 모듈 `marketing/`** (아래 '분리된 모듈' 참고).
-  팀: 직원1 데이터 분석가 · 직원2 사업 기획자 · 팀장(부장), 감사는 사장님. 시장조사 → 회의 → 사업 계획서 → 사장님 승인.
-  시장조사(주제 → 후보 키워드 → 프로그램 조사 → 분석가 보고서)는 됨. 회의실은 준비 중.
+- 마케팅사업부 (`/dept/marketing`): **별도 모듈 `marketing/`** (아래 '분리된 모듈' 참고). 부서 안에 팀이 계속 생긴다 (`marketing/org.js`).
+  - 신사업팀 (`/dept/marketing/team/newbiz`, 운영 중): 팀원1 데이터 분석가 · 팀원2 사업 기획자 · 팀장, 감사는 사장님.
+    주간 업무: ① 월요일 경제 브리핑(자동, 월 07:00) ② 시장 탐색 ③ 팀장 지시(+사장님 지시) ④ 심층 조사 ⑤ 회의(최대 3라운드) ⑥ 주간 보고서(매주 필수).
+    자료는 Haiku+웹 검색, 글은 직원 모델. 브리핑·보고서는 회사 게시판에 올라간다. 국내 + 해외 판매(일본·동남아·중국·미국). 교육·레슨 제외.
+    업무 정의 문서: https://claude.ai/artifact/XKFZLd4FKotxQXoN5hRLEA
+  - 운영팀 (준비 중): 승인된 사업의 SNS·판매 채널 운영.
+- 회사 게시판 (`/board`): 부서 보고서를 회사 전체가 본다. 별도 모듈 `board/`.
 - 시장조사 프로그램 (`/research`): 키 상태·연결 테스트·직접 조사·조사 기록. 마케팅사업부 화면에서 링크.
 - 투자운영사업부 (`/dept/investment`): **매매 방법 1개 = 직원 1명 = 매매 프로그램 1개.** 바이낸스 현물.
   직원 화면 탭: 학습(사진·URL·글) → 전략(버전·승인) → 프로그램(모드, 지금 실행, 모의/실제 매매) → 현황(수익률·보유·내역) → 대화·지침.
   부서 화면: 직원 목록(모의 수익률 순), [+ 직원 추가], 부서 공통 지침, 노트북 연결 상태.
 
-## 분리된 모듈 (marketing/, research/)
+## 분리된 모듈 (marketing/, research/, board/)
 - **다른 기능을 고칠 때 모듈 폴더는 건드리지 않는다. 모듈을 고칠 때는 그 폴더 안에서만 고친다.**
 - `marketing/` = 마케팅사업부 (화면·API·데이터·지침). 구조는 `marketing/README.md`.
 - `research/` = 시장조사 프로그램 (네이버 숫자를 재는 고정 프로그램, AI 없음). 구조는 `research/README.md`.
   할 수 있는 일·못 하는 일은 `research/capabilities.js` 한 곳. 동작을 바꾸면 같이 고친다 (투자부 capabilities 와 같은 원칙).
 - 공용 코드는 각 모듈의 `core/server.js`·`core/client.js` 로만 가져온다. 공용 코드 사용법이 바뀌면 이 파일들만 고친다.
-- 모듈끼리는 공개 입구만: 마케팅 → `research/index.js`·`research/client.js` (마케팅의 `core/` 를 거쳐서).
+- `board/` = 회사 게시판 (글 저장·목록·화면, 마크다운 표시기). 구조는 `board/README.md`.
+- 모듈끼리는 공개 입구만: 마케팅 → `research/index.js`·`research/client.js`·`board/index.js`·`board/client.js` (마케팅의 `core/` 를 거쳐서).
 - 공용 코드가 모듈을 가져오는 곳은 `lib/departments.js` → `marketing/department.js` 하나뿐 (조직도 등록).
   부서 정보의 `ownModule: true` → 공용 직원 코드(`lib/members.js`, `/api/departments`, `/api/members`, `app/dept/[id]`)는 그 부서를 다루지 않는다.
-- Next.js 위치(`app/dept/marketing/`, `app/api/marketing/`, `app/research/`, `app/api/research/`)에는 연결선 한 줄짜리 파일만 둔다.
-- 컬렉션 접두사: 마케팅 `mpc_mkt_`, 시장조사 `mpc_rsh_`. 공용 `COL` 에 넣지 않는다.
+- Next.js 위치(`app/dept/marketing/`, `app/api/marketing/`, `app/research/`, `app/api/research/`, `app/board/`, `app/api/board/`)에는 연결선 한 줄짜리 파일만 둔다.
+  (예외: route 파일의 `dynamic`·`maxDuration` 설정 줄)
+- 컬렉션 접두사: 마케팅 `mpc_mkt_`, 시장조사 `mpc_rsh_`, 게시판 `mpc_board_`. 공용 `COL` 에 넣지 않는다.
+- Vercel Cron: `vercel.json` (매주 일요일 22:00 UTC = 월요일 07:00 한국 시간 → `/api/marketing/cron/weekly`, `CRON_SECRET` 으로 보호). Hobby 는 하루 1번까지.
 - 경계 검사 `scripts/check-module-boundaries.mjs` 가 `npm run build` 전(prebuild)에 돈다. 어기면 배포되지 않는다.
   새 모듈을 만들면 이 스크립트의 `MODULES` 에 추가한다.
-- 테스트: `npm run test:marketing`, `npm run test:research`
+- 테스트: `npm run test:marketing`, `npm run test:research`, `npm run test:board`
 
 ## 다음 할 일
 - 노트북에 worker 설치·실행 (worker/README.md) → 모의매매 확인 → 테스트넷 → 소액 실전
-- 비서: API 크레딧·토큰 비용 보고 (충전액 $8 − 누적 비용) → 매출·비용 장부 → 구글 캘린더 → 아침 텔레그램 브리핑
+- 신사업팀 첫 주 돌려 보기 → 보고서 품질 보고 지시문(`marketing/teams/newbiz/prompts.js`) 다듬기 → 운영팀
+- 비서: API 크레딧·토큰 비용 보고 (충전액 $8 − 누적 비용, `mpc_ai_budget` 활용) → 매출·비용 장부 → 구글 캘린더 → 아침 텔레그램 브리핑

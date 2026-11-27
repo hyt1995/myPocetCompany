@@ -4,9 +4,9 @@
 // 마케팅 모듈의 다른 파일에서 '../../lib/...' 처럼 공용 코드를 직접 가져오면
 // 빌드 전에 scripts/check-module-boundaries.mjs 가 막는다.
 //
-// callClaude 를 공유하는 이유: 모든 AI 호출의 비용 기록과 (나중의) 킬 스위치는 회사 전체에 똑같이 적용돼야 한다.
+// callClaude 를 공유하는 이유: 모든 AI 호출의 비용 기록과 킬 스위치(하루 한도)는 회사 전체에 똑같이 적용돼야 한다.
 
-export { callClaude, ClaudeError, MODELS } from '../../lib/claude';
+export { callClaude, ClaudeError, getTodaySpend, MODELS, webSearchTool } from '../../lib/claude';
 export { guarded, httpError, readJson } from '../../lib/http';
 export { requireDb } from '../../lib/firebase';
 
@@ -22,3 +22,6 @@ export {
   tableForAi,
   validatePlan,
 } from '../../research/index.js';
+
+// 회사 게시판 (board/ 모듈) — 공개 입구만 쓴다. 신사업팀 보고서·브리핑을 회사 전체에 올린다.
+export { publishPost } from '../../board/index.js';

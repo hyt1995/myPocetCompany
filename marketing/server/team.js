@@ -7,7 +7,14 @@
 
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { httpError, requireDb } from '../core/server';
-import { DEFAULT_COMMON_GUIDELINE, findSeed, TEAM } from '../team';
+import {
+  DEFAULT_COMMON_GUIDELINE,
+  findSeed,
+  LEGACY_COMMON_GUIDELINE_HASHES,
+  LEGACY_DEFAULT_PROMPT_HASHES,
+  promptHash,
+  TEAM,
+} from '../team';
 import { MKT_COL, SETTINGS_DOC } from './collections';
 import { cleanGuideline, cleanMemberPatch, toMember } from './fields';
 
@@ -16,10 +23,23 @@ export async function listTeam() {
   const snap = await getDocs(collection(db, MKT_COL.members));
   const existing = new Map(snap.docs.map((d) => [d.id, d.data()]));
 
-  // 기본 직원이 DB에 없으면 만든다.
+  // 기본 직원이 DB에 없으면 만든다. 예전 버전 직원(팀 없음)은 신사업팀으로 옮긴다.
   for (const seed of TEAM) {
-    if (existing.has(seed.id)) continue;
+    const old = existing.get(seed.id);
+    if (old && !old.teamId) {
+      const patch = { teamId: seed.teamId, title: seed.title, updatedAt: Date.now() };
+      // 사장님이 지침을 고친 적이 없으면(예전 기본 지침 그대로) 새 기본 지침으로 바꾼다.
+      if (LEGACY_DEFAULT_PROMPT_HASHES.includes(promptHash(old.systemPrompt))) {
+        patch.systemPrompt = seed.systemPrompt;
+        patch.role = seed.role;
+      }
+      await updateDoc(doc(db, MKT_COL.members, seed.id), patch);
+      existing.set(seed.id, { ...old, ...patch });
+      continue;
+    }
+    if (old) continue;
     const data = {
+      teamId: seed.teamId,
       order: seed.order,
       title: seed.title,
       name: seed.name,
@@ -66,9 +86,14 @@ export async function updateMarketingMember(memberId, fields = {}) {
 export async function getMarketingSettings() {
   const snap = await getDoc(doc(requireDb(), MKT_COL.settings, SETTINGS_DOC));
   const d = snap.exists() ? snap.data() : null;
+  // 저장된 값이 없거나 예전 기본 규칙 그대로면 새 기본 규칙을 쓴다.
+  const saved =
+    typeof d?.commonGuideline === 'string' && !LEGACY_COMMON_GUIDELINE_HASHES.includes(promptHash(d.commonGuideline))
+      ? d.commonGuideline
+      : null;
   return {
-    commonGuideline: typeof d?.commonGuideline === 'string' ? d.commonGuideline : DEFAULT_COMMON_GUIDELINE,
-    isDefault: !d || typeof d.commonGuideline !== 'string',
+    commonGuideline: saved ?? DEFAULT_COMMON_GUIDELINE,
+    isDefault: saved === null,
     updatedAt: d?.updatedAt || null,
   };
 }
@@ -82,7 +107,7 @@ export async function updateMarketingSettings({ commonGuideline }) {
   return getMarketingSettings();
 }
 
-// 직원이 일할 때 읽는 전체 지침 = 부서 공통 지침(회의 규칙) + 직원 지침. (회의실 단계에서 쓴다)
+// 직원이 일할 때 읽는 전체 지침 = 부서 공통 지침 + 직원 지침 + 이번 일의 지시(extra).
 export async function buildMarketingSystemPrompt(member, extra = '') {
   const { commonGuideline } = await getMarketingSettings();
   return [

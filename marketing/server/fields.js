@@ -21,6 +21,7 @@ export function cleanGuideline(text) {
 export function toMember(id, data = {}, seed = null) {
   return {
     id,
+    teamId: data.teamId || seed?.teamId || 'newbiz',
     order: typeof data.order === 'number' ? data.order : seed?.order ?? 99,
     title: data.title || seed?.title || '',
     name: data.name || seed?.name || '이름 없음',

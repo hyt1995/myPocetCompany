@@ -5,6 +5,7 @@ export const MKT_COL = {
   members: 'mpc_mkt_members', // 마케팅 직원 (이름, 직함, 역할, 모델 등급, 지침)
   settings: 'mpc_mkt_settings', // 문서 'department': 부서 공통 지침(회의 규칙)
   research: 'mpc_mkt_research', // 시장조사 안건 (주제, 후보 키워드, 조사 번호, 데이터 분석가 보고서)
+  work: 'mpc_mkt_work', // 팀 주간 업무. 문서 id = '{팀 id}_{주}' (예: newbiz_2026-W48), 단계별 결과는 steps.{단계}
 };
 
 export const SETTINGS_DOC = 'department';

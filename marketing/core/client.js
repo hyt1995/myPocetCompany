@@ -2,7 +2,10 @@
 // 서버 전용 코드(lib/claude 등)는 여기에 넣지 않는다 — 폰 화면 코드에 섞이면 안 된다.
 
 export { PasscodeGate, useApi } from '../../components/passcode';
-export { formatTime } from '../../components/format';
+export { formatCost, formatTime } from '../../components/format';
 
 // 시장조사 프로그램 (research/ 모듈) 화면 부품 — 공개 입구만 쓴다.
 export { ResearchProgress, ResearchTable, useResearchRunner } from '../../research/client.js';
+
+// 회사 게시판 (board/ 모듈) 화면 부품 — 보고서 본문 표시
+export { Markdown } from '../../board/client.js';
