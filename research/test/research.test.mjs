@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { MAX_KEYWORDS } from '../capabilities.js';
 import { trendRange } from '../dates.js';
 import { buildRow, parseCount, rankRows, tableForAi, trendMetrics } from '../metrics.js';
+import { describeRanking, validateRanking } from '../ranking.js';
 import { compactKeyword, splitKeywords, validatePlan } from '../plan.js';
 import { searchadSignature } from '../sign.js';
 
@@ -106,10 +107,56 @@ test('순위는 점수 높은 순, AI 표는 숫자가 없으면 "확인 못 함
   );
   const table = tableForAi(ranked, 2);
   assert.match(table, /확인 못 함/);
-  assert.match(table, /나머지 1개/);
+  assert.match(table, /생략: 1개/);
+  assert.match(table, /기회 점수/);
 });
 
 test('검색광고 서명 = HMAC-SHA256 base64', () => {
   const expected = createHmac('sha256', 'secret').update('1700000000000.GET./keywordstool').digest('base64');
   assert.equal(searchadSignature('1700000000000', 'GET', '/keywordstool', 'secret'), expected);
+});
+
+const sample = () => ({
+  k0: buildRow('큰수요', { searchad: { monthlyPcQcCnt: 9000, monthlyMobileQcCnt: 1000, monthlyAvePcClkCnt: 5 }, blogTotal: 90000, trend: { yoy: 1 } }),
+  k1: buildRow('빈시장', { searchad: { monthlyPcQcCnt: 300, monthlyMobileQcCnt: 300, monthlyAvePcClkCnt: 50 }, blogTotal: 60, trend: { yoy: 1.2 } }),
+  k2: buildRow('급성장', { searchad: { monthlyPcQcCnt: 1000, monthlyMobileQcCnt: 1000 }, blogTotal: 20000, trend: { yoy: 3 } }),
+  k3: buildRow('모름', {}),
+});
+
+test('줄 세우기 기준은 조사마다 바꿀 수 있다', () => {
+  const order = (ranking) => rankRows(sample(), ranking).map((r) => r.keyword);
+  assert.deepEqual(order({ sortBy: 'monthly' }), ['큰수요', '급성장', '빈시장', '모름']);
+  assert.deepEqual(order({ sortBy: 'competition' }), ['빈시장', '큰수요', '급성장', '모름']); // 낮은 순, 값 없는 건 맨 아래
+  assert.deepEqual(order({ sortBy: 'yoy' }), ['급성장', '빈시장', '큰수요', '모름']);
+  assert.deepEqual(order({ sortBy: 'adClicks' })[0], '빈시장');
+  assert.deepEqual(order(undefined)[0], '빈시장'); // 기본 = 기회 점수
+});
+
+test('거르기를 못 넘은 키워드는 아래로, AI 표에서는 빠진다', () => {
+  const ranking = { sortBy: 'monthly', minMonthly: 1000, maxCompetition: 20 };
+  const ranked = rankRows(sample(), ranking);
+  assert.deepEqual(
+    ranked.filter((r) => r.inRange).map((r) => r.keyword),
+    ['큰수요', '급성장'], // 빈시장은 월 검색 600, 모름은 숫자 없음 → 빠짐
+  );
+  const table = tableForAi(ranked, { ...ranking, top: 10 });
+  assert.doesNotMatch(table, /빈시장/);
+  assert.match(table, /거르기 조건을 못 넘어 뺀 키워드: 2개/);
+  assert.match(table, /월 검색수 · 월 검색수 최소 1,000 · 경쟁비 최대 20/);
+});
+
+test('줄 세우기 기준 검사는 엄격하다', () => {
+  assert.equal(validateRanking(undefined).ranking.sortBy, 'score');
+  assert.equal(validateRanking({ sortBy: 'price' }).ok, false); // 판매량·가격 순은 없다
+  assert.equal(validateRanking({ sortBy: 'score', magic: 1 }).ok, false);
+  assert.equal(validateRanking({ top: 500 }).ok, false);
+  assert.equal(validateRanking({ minMonthly: '1000' }).ok, false);
+  assert.deepEqual(validateRanking({ sortBy: 'yoy', top: 20, minYoy: 1.2 }).ranking, { sortBy: 'yoy', top: 20, minYoy: 1.2 });
+  assert.equal(describeRanking({ sortBy: 'competition', top: 30 }), '경쟁 적은 순 · 보고서 상위 30개');
+});
+
+test('조사 계획에 줄 세우기 기준을 넣을 수 있고, 틀리면 실행 안 한다', () => {
+  assert.equal(validatePlan({ title: 't', keywords: ['선크림'], ranking: { sortBy: 'monthly' } }).plan.ranking.sortBy, 'monthly');
+  assert.equal(validatePlan({ title: 't', keywords: ['선크림'] }).plan.ranking.sortBy, 'score');
+  assert.equal(validatePlan({ title: 't', keywords: ['선크림'], ranking: { sortBy: 'sales' } }).ok, false);
 });

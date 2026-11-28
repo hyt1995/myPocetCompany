@@ -13,6 +13,7 @@ export { requireDb } from '../../lib/firebase';
 // 시장조사 프로그램 (research/ 모듈) — 공개 입구만 쓴다. 숫자를 재는 건 프로그램, 해석은 마케팅 직원.
 export {
   createRun,
+  describeRanking,
   getRun,
   isValidKeyword,
   MAX_KEYWORDS,
@@ -21,6 +22,7 @@ export {
   splitKeywords,
   tableForAi,
   validatePlan,
+  validateRanking,
 } from '../../research/index.js';
 
 // 회사 게시판 (board/ 모듈) — 공개 입구만 쓴다. 신사업팀 보고서·브리핑을 회사 전체에 올린다.

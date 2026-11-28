@@ -16,7 +16,7 @@ export const getHandler = guarded(async (request, { agendaId }) => Response.json
 
 export const startHandler = guarded(async (request, { agendaId }) => {
   const body = await readJson(request);
-  return Response.json({ agenda: await startAgendaResearch(agendaId, body.keywordsText) });
+  return Response.json({ agenda: await startAgendaResearch(agendaId, body.keywordsText, body.ranking) });
 });
 
 export const reportHandler = guarded(async (request, { agendaId }) =>

@@ -5,7 +5,16 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { formatTime, ResearchProgress, ResearchTable, useApi, useResearchRunner } from '../core/client';
+import {
+  DEFAULT_RANKING,
+  formatTime,
+  RankingPicker,
+  ResearchProgress,
+  ResearchTable,
+  RunRankingEditor,
+  useApi,
+  useResearchRunner,
+} from '../core/client';
 
 const STATUS_LABELS = { draft: '후보 작성됨', researching: '조사 시작됨', reported: '보고서 완료' };
 
@@ -101,6 +110,7 @@ const ROW_BUTTON = { textAlign: 'left', font: 'inherit', cursor: 'pointer', widt
 function Agenda({ agenda, onChange, onClose }) {
   const api = useApi();
   const [text, setText] = useState(agenda.candidates.join('\n'));
+  const [ranking, setRanking] = useState(agenda.ranking || DEFAULT_RANKING);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
@@ -139,13 +149,15 @@ function Agenda({ agenda, onChange, onClose }) {
             <p className="hint">형식이 안 맞아 뺀 후보: {agenda.dropped.slice(0, 8).join(', ')}</p>
           )}
           <textarea rows={12} value={text} onChange={(e) => setText(e.target.value)} />
+          {agenda.rankingWhy && <p className="hint">분석가가 고른 기준: {agenda.rankingWhy}</p>}
+          <RankingPicker value={ranking} onChange={setRanking} disabled={Boolean(busy)} />
           <button
             type="button"
             disabled={Boolean(busy) || count === 0}
             onClick={() =>
               call('start', `/api/marketing/research/${agenda.id}`, {
                 method: 'PUT',
-                body: JSON.stringify({ keywordsText: text }),
+                body: JSON.stringify({ keywordsText: text, ranking }),
               })
             }
           >
@@ -169,6 +181,7 @@ function Agenda({ agenda, onChange, onClose }) {
         <div className="ask">
           <p className="hint">
             {agenda.report.by} 보고서 · {formatTime(agenda.report.at)}
+            {agenda.report.rankingLabel ? ` · 기준: ${agenda.report.rankingLabel}` : ''}
           </p>
           <div style={{ whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>{agenda.report.text}</div>
         </div>
@@ -180,7 +193,7 @@ function Agenda({ agenda, onChange, onClose }) {
 }
 
 function RunSection({ runId, autoStart, canReport, hasReport, reporting, onReport }) {
-  const { run, running, error, start, stop } = useResearchRunner(runId);
+  const { run, running, error, start, stop, applyRanking } = useResearchRunner(runId);
   const [kicked, setKicked] = useState(false);
 
   useEffect(() => {
@@ -202,6 +215,7 @@ function RunSection({ runId, autoStart, canReport, hasReport, reporting, onRepor
       )}
       {error && <p className="msg error">{error}</p>}
       <ResearchTable run={run} initialLimit={15} />
+      <RunRankingEditor run={run} onApply={applyRanking} disabled={running} />
       {run.status === 'done' && (
         <button
           type="button"

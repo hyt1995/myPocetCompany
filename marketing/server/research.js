@@ -21,6 +21,7 @@ import {
 import {
   callClaude,
   createRun,
+  describeRanking,
   getRun,
   httpError,
   isValidKeyword,
@@ -31,6 +32,7 @@ import {
   requireDb,
   splitKeywords,
   tableForAi,
+  validateRanking,
 } from '../core/server';
 import { MKT_COL } from './collections';
 import { buildMarketingSystemPrompt, getMarketingMember } from './team';
@@ -46,6 +48,8 @@ function toAgenda(id, d) {
     topic: d.topic,
     candidates: d.candidates || [],
     dropped: d.dropped || [],
+    ranking: d.ranking || null, // 데이터 분석가가 고른 줄 세우기 기준 (조사 시작 전). 시작 후에는 조사(run)의 기준이 기준이다
+    rankingWhy: d.rankingWhy || '',
     status: d.status,
     runId: d.runId || null,
     report: d.report || null,
@@ -71,15 +75,25 @@ export async function getAgenda(agendaId) {
   return toAgenda(snap.id, snap.data());
 }
 
-// AI 답에서 키워드 목록 꺼내기: {"keywords":[...]} 를 먼저 찾고, 안 되면 줄 단위로.
+// AI 답에서 키워드 목록·줄 세우기 기준 꺼내기: {"keywords":[...], "ranking":{...}} 를 먼저 찾고, 안 되면 줄 단위로.
+// 기준이 프로그램이 모르는 것이면 쓰지 않고 기본 기준으로 둔다 (바꿔 넣지 않는다).
 export function parseCandidates(reply) {
   let list = [];
+  let ranking = null;
+  let rankingWhy = '';
   const start = reply.indexOf('{');
   const end = reply.lastIndexOf('}');
   if (start !== -1 && end > start) {
     try {
       const parsed = JSON.parse(reply.slice(start, end + 1));
       if (Array.isArray(parsed.keywords)) list = parsed.keywords.map(String);
+      if (parsed.ranking) {
+        const checked = validateRanking(parsed.ranking);
+        ranking = checked.ok ? checked.ranking : null;
+        rankingWhy = checked.ok
+          ? String(parsed.rankingWhy || '').slice(0, 300)
+          : `분석가가 고른 기준을 프로그램이 할 수 없어 기본 기준으로 둠 (${checked.errors[0]})`;
+      }
     } catch {
       // 아래에서 줄 단위로
     }
@@ -101,7 +115,7 @@ export function parseCandidates(reply) {
     seen.add(key);
     keywords.push(k);
   }
-  return { keywords: keywords.slice(0, MAX_KEYWORDS), dropped };
+  return { keywords: keywords.slice(0, MAX_KEYWORDS), dropped, ranking, rankingWhy };
 }
 
 // ① 안건 만들기 + 데이터 분석가가 후보 키워드 작성
@@ -128,12 +142,14 @@ export async function createAgenda(topicInput) {
 - 한글·영문·숫자·띄어쓰기만, 30자 이내
 - 업종 × 반복 업무·불편을 조합하고, '대행', '외주', '프로그램', '자동화', '비용'처럼 돈을 낼 의사가 보이는 표현을 섞는다
 - 같은 수요를 다른 말로 부르는 표현도 몇 개 넣는다 (묶어서 볼 수 있게)
-출력은 JSON 한 줄만: {"keywords":["...", "..."]}`,
+그리고 이 안건의 목적에 맞는 '줄 세우기 기준'을 위 [줄 세우기 기준]에서만 고른다.
+(예: 빈 시장 찾기 → competition, 시장 크기 → monthly, 뜨는 것 → yoy, 돈 낼 의사 → adClicks, 잘 모르겠으면 score)
+출력은 JSON 한 줄만: {"keywords":["...", "..."], "ranking":{"sortBy":"score","top":40}, "rankingWhy":"한 줄 이유"}`,
       },
     ],
   });
 
-  const { keywords, dropped } = parseCandidates(reply);
+  const { keywords, dropped, ranking, rankingWhy } = parseCandidates(reply);
   if (keywords.length === 0) throw httpError(502, '후보 키워드를 만들지 못했어요. 다시 시도해 주세요.');
 
   const now = Date.now();
@@ -141,6 +157,8 @@ export async function createAgenda(topicInput) {
     topic,
     candidates: keywords,
     dropped,
+    ranking: ranking || validateRanking(null).ranking,
+    rankingWhy,
     status: 'draft',
     runId: null,
     report: null,
@@ -151,15 +169,17 @@ export async function createAgenda(topicInput) {
   return getAgenda(ref.id);
 }
 
-// ② 사장님이 고친 후보로 [조사 시작] → 시장조사 프로그램에 조사를 맡긴다
-export async function startAgendaResearch(agendaId, keywordsText) {
+// ② 사장님이 고친 후보·기준으로 [조사 시작] → 시장조사 프로그램에 조사를 맡긴다
+export async function startAgendaResearch(agendaId, keywordsText, rankingInput) {
   const agenda = await getAgenda(agendaId);
   if (agenda.runId) throw httpError(400, '이미 조사를 시작한 안건이에요.');
   const keywords = typeof keywordsText === 'string' ? splitKeywords(keywordsText) : agenda.candidates;
 
-  const run = await createRun({ title: agenda.topic, keywords }, { module: 'marketing', refId: agendaId });
+  const ranking = rankingInput ?? agenda.ranking ?? undefined;
+  const run = await createRun({ title: agenda.topic, keywords, ranking }, { module: 'marketing', refId: agendaId });
   await updateDoc(doc(requireDb(), MKT_COL.research, agendaId), {
     candidates: keywords.map(normalizeKeyword),
+    ranking: run.ranking,
     runId: run.id,
     status: 'researching',
     updatedAt: Date.now(),
@@ -189,8 +209,9 @@ export async function writeAgendaReport(agendaId) {
         role: 'user',
         content: `[안건] ${agenda.topic}
 [조사 기간] 추세 ${run.range?.startDate} ~ ${run.range?.endDate}, 키워드 ${run.total}개
+[줄 세우기 기준] ${describeRanking(run.ranking)} — 표는 이 기준으로 정렬·걸러졌다. 기준이 보여 주는 관점에서 해석한다.
 [조사 결과 표 — 이 표의 숫자만 근거로 쓴다]
-${tableForAi(run.ranked, 40)}
+${tableForAi(run.ranked, run.ranking)}
 ${run.errors?.length ? `\n[조회 실패] ${run.errors.slice(-5).join(' / ')}` : ''}
 
 데이터 분석가로서 보고서를 써라.
@@ -204,7 +225,7 @@ ${run.errors?.length ? `\n[조회 실패] ${run.errors.slice(-5).join(' / ')}` :
   });
 
   await updateDoc(doc(requireDb(), MKT_COL.research, agendaId), {
-    report: { text: reply, model, costUsd, at: Date.now(), by: analyst.name },
+    report: { text: reply, model, costUsd, at: Date.now(), by: analyst.name, rankingLabel: describeRanking(run.ranking) },
     status: 'reported',
     updatedAt: Date.now(),
   });

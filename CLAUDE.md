@@ -80,6 +80,7 @@ AI 부서들이 일하고, 사장님은 폰으로 확인·지시하는 1인 회�
 - `marketing/` = 마케팅사업부 (화면·API·데이터·지침). 구조는 `marketing/README.md`.
 - `research/` = 시장조사 프로그램 (네이버 숫자를 재는 고정 프로그램, AI 없음). 구조는 `research/README.md`.
   할 수 있는 일·못 하는 일은 `research/capabilities.js` 한 곳. 동작을 바꾸면 같이 고친다 (투자부 capabilities 와 같은 원칙).
+  줄 세우기 기준(정렬·거르기·보고서 줄 수)은 조사마다 고른다 (`SORT_KEYS`, `research/ranking.js`). AI 표에는 기준을 통과한 상위 N줄만 넘긴다.
 - 공용 코드는 각 모듈의 `core/server.js`·`core/client.js` 로만 가져온다. 공용 코드 사용법이 바뀌면 이 파일들만 고친다.
 - `board/` = 회사 게시판 (글 저장·목록·화면, 마크다운 표시기). 구조는 `board/README.md`.
 - 모듈끼리는 공개 입구만: 마케팅 → `research/index.js`·`research/client.js`·`board/index.js`·`board/client.js` (마케팅의 `core/` 를 거쳐서).

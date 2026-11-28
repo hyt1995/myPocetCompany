@@ -1,7 +1,8 @@
 // 숫자 계산. 외부 의존 없음 → research/test 에서 테스트.
 // 계산 방법을 바꾸면 capabilities.js 의 설명도 같이 고친다.
 
-import { GROWTH_CLAMP, MIN_DEMAND } from './capabilities.js';
+import { GROWTH_CLAMP, MIN_DEMAND, SORT_KEYS } from './capabilities.js';
+import { describeRanking, passesFilters, safeRanking } from './ranking.js';
 
 // 검색광고 API 의 검색수: 숫자 또는 "< 10"
 export function parseCount(value) {
@@ -87,21 +88,38 @@ export function buildRow(keyword, raw = {}) {
   };
 }
 
-// rows: { k0: row, ... } → 점수 높은 순 배열 (점수 없는 것은 뒤로)
-export function rankRows(rows = {}) {
+// rows: { k0: row, ... } → 줄 세우기 기준(ranking)대로 정렬한 배열.
+// 거르기를 통과한 키워드가 위, 못 넘은 키워드는 아래(inRange: false). 값이 없는 키워드는 각 묶음의 맨 아래.
+export function rankRows(rows = {}, ranking) {
+  const r = safeRanking(ranking);
+  const { field, order } = SORT_KEYS[r.sortBy];
+  const dir = order === 'asc' ? 1 : -1;
+  const val = (row) => (typeof row[field] === 'number' && Number.isFinite(row[field]) ? row[field] : null);
+  const cmp = (a, b) => {
+    const va = val(a);
+    const vb = val(b);
+    if (va === null || vb === null) {
+      if (va !== vb) return va === null ? 1 : -1;
+    } else if (va !== vb) return (va - vb) * dir;
+    return (b.score ?? -1) - (a.score ?? -1) || (b.monthly ?? -1) - (a.monthly ?? -1);
+  };
   return Object.entries(rows)
-    .map(([id, row]) => ({ id, ...row }))
-    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || (b.monthly ?? -1) - (a.monthly ?? -1))
+    .map(([id, row]) => ({ id, ...row, inRange: passesFilters(row, r) }))
+    .sort((a, b) => Number(b.inRange) - Number(a.inRange) || cmp(a, b))
     .map((row, i) => ({ rank: i + 1, ...row }));
 }
 
 const fmt = (v, suffix = '') => (v === null || v === undefined ? '확인 못 함' : `${v}${suffix}`);
 
-// AI 직원에게 넘기는 표 (토큰을 아끼려고 상위 limit 개만, 한 줄씩)
-export function tableForAi(ranked, limit = 40) {
-  const head = '순위 | 키워드 | 월 검색수 | 블로그 글 수 | 경쟁비 | 1년 성장률 | 3개월 성장률 | 광고 경쟁 | 기회 점수 | 표시';
-  const lines = ranked
-    .slice(0, limit)
+// AI 직원에게 넘기는 표 (토큰을 아끼려고 기준을 통과한 상위 top 개만, 한 줄씩).
+// rankingOrLimit: 줄 세우기 기준 객체, 또는 (예전 방식) 줄 수 숫자
+export function tableForAi(ranked, rankingOrLimit) {
+  const ranking =
+    typeof rankingOrLimit === 'number' ? { ...safeRanking(null), top: rankingOrLimit } : safeRanking(rankingOrLimit);
+  const passed = ranked.filter((row) => row.inRange !== false);
+  const head = '순위 | 키워드 | 월 검색수 | 블로그 글 수 | 경쟁비 | 1년 성장률 | 3개월 성장률 | 광고 경쟁 | 광고 클릭수 | 기회 점수 | 표시';
+  const lines = passed
+    .slice(0, ranking.top)
     .map((r) =>
       [
         r.rank,
@@ -112,10 +130,13 @@ export function tableForAi(ranked, limit = 40) {
         fmt(r.yoy, '배'),
         fmt(r.momentum, '배'),
         r.compIdx || '확인 못 함',
+        fmt(r.adClicks),
         fmt(r.score),
         r.flags.join(', ') || '-',
       ].join(' | '),
     );
-  const rest = ranked.length > limit ? `\n(나머지 ${ranked.length - limit}개는 점수가 더 낮아 생략)` : '';
-  return `${head}\n${lines.join('\n')}${rest}`;
+  const notes = [`(줄 세우기 기준: ${describeRanking(ranking)})`];
+  if (passed.length > ranking.top) notes.push(`(기준을 통과했지만 ${ranking.top}위 밖이라 생략: ${passed.length - ranking.top}개)`);
+  if (ranked.length > passed.length) notes.push(`(거르기 조건을 못 넘어 뺀 키워드: ${ranked.length - passed.length}개)`);
+  return `${head}\n${lines.join('\n')}\n${notes.join('\n')}`;
 }

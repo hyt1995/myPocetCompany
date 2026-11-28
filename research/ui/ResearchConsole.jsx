@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { formatTime, useApi } from '../core/client';
+import { DEFAULT_RANKING } from '../capabilities.js';
+import RankingPicker, { RunRankingEditor } from './RankingPicker';
 import { ResearchProgress, ResearchTable } from './ResearchTable';
 import { useResearchRunner } from './useResearchRunner';
 
@@ -90,6 +92,7 @@ function NewRun({ onCreated }) {
   const api = useApi();
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
+  const [ranking, setRanking] = useState(DEFAULT_RANKING);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -100,7 +103,7 @@ function NewRun({ onCreated }) {
     try {
       const data = await api('/api/research/runs', {
         method: 'POST',
-        body: JSON.stringify({ title, keywordsText: text }),
+        body: JSON.stringify({ title, keywordsText: text, ranking }),
       });
       setText('');
       onCreated(data.run.id);
@@ -123,6 +126,7 @@ function NewRun({ onCreated }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
+          <RankingPicker value={ranking} onChange={setRanking} disabled={busy} />
           <button type="submit" disabled={busy || !title.trim() || !text.trim()}>
             {busy ? '준비 중…' : '조사 시작'}
           </button>
@@ -134,7 +138,7 @@ function NewRun({ onCreated }) {
 }
 
 function RunView({ runId, autoStart = false }) {
-  const { run, running, error, start, stop } = useResearchRunner(runId);
+  const { run, running, error, start, stop, applyRanking } = useResearchRunner(runId);
   const [started, setStarted] = useState(false);
 
   useEffect(() => {
@@ -156,6 +160,7 @@ function RunView({ runId, autoStart = false }) {
       )}
       {error && <p className="msg error">{error}</p>}
       <ResearchTable run={run} />
+      <RunRankingEditor run={run} onApply={applyRanking} disabled={running} />
     </section>
   );
 }

@@ -20,6 +20,7 @@ import { BATCH_SIZE } from '../capabilities.js';
 import { trendRange } from '../dates.js';
 import { buildRow, rankRows, trendMetrics } from '../metrics.js';
 import { compactKeyword, validatePlan } from '../plan.js';
+import { describeRanking, safeRanking, validateRanking } from '../ranking.js';
 import { keyStatus } from '../sources/keys.js';
 import { DATALAB_PER_CALL, fetchBlogTotal, fetchTrends } from '../sources/naverHub.js';
 import { fetchKeywordStats, SEARCHAD_PER_CALL } from '../sources/searchad.js';
@@ -43,6 +44,7 @@ export async function createRun(input, requestedBy = { module: 'research', refId
   await setDoc(ref, {
     title: plan.title,
     keywords: plan.keywords,
+    ranking: plan.ranking,
     total: plan.keywords.length,
     cursor: 0,
     status: 'ready', // ready → running → done
@@ -60,6 +62,7 @@ export async function createRun(input, requestedBy = { module: 'research', refId
 }
 
 function toRun(id, d) {
+  const ranking = safeRanking(d.ranking);
   return {
     id,
     title: d.title,
@@ -73,7 +76,9 @@ function toRun(id, d) {
     at: d.at,
     updatedAt: d.updatedAt,
     finishedAt: d.finishedAt,
-    ranked: rankRows(d.rows || {}),
+    ranking,
+    rankingLabel: describeRanking(ranking),
+    ranked: rankRows(d.rows || {}, ranking),
   };
 }
 
@@ -81,6 +86,17 @@ export async function getRun(runId) {
   const snap = await getDoc(doc(requireDb(), RSH_COL.runs, runId));
   if (!snap.exists()) return null;
   return toRun(snap.id, snap.data());
+}
+
+// 줄 세우기 기준 바꾸기. 네이버를 다시 부르지 않는다 (이미 잰 숫자를 다시 정렬할 뿐). 쓰기 1번.
+export async function updateRunRanking(runId, input) {
+  const { ok, errors, ranking } = validateRanking(input);
+  if (!ok) throw httpError(400, `줄 세우기 기준을 쓸 수 없어요: ${errors.join(' / ')}`);
+  const ref = doc(requireDb(), RSH_COL.runs, runId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw httpError(404, '조사를 찾을 수 없어요.');
+  await updateDoc(ref, { ranking, updatedAt: Date.now() });
+  return toRun(snap.id, { ...snap.data(), ranking });
 }
 
 // 최근 조사 목록 (결과 표 없이 요약만)

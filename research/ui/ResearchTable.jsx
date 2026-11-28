@@ -1,6 +1,6 @@
 'use client';
 
-// 조사 결과 표: 기회 점수 높은 순. 폰에서는 옆으로 밀어서 본다.
+// 조사 결과 표: 조사의 줄 세우기 기준 순. 거르기를 못 넘은 줄은 흐리게. 폰에서는 옆으로 밀어서 본다.
 
 import { useState } from 'react';
 
@@ -33,6 +33,7 @@ export function ResearchTable({ run, initialLimit = 30 }) {
 
   return (
     <>
+      {run.rankingLabel && <p className="hint">줄 세우기: {run.rankingLabel}</p>}
       {run.errors?.length > 0 && (
         <p className="msg error">일부 조회 실패: {run.errors.slice(-3).join(' / ')}</p>
       )}
@@ -49,12 +50,13 @@ export function ResearchTable({ run, initialLimit = 30 }) {
               <th style={HEAD}>1년 성장</th>
               <th style={HEAD}>3개월 성장</th>
               <th style={HEAD}>광고 경쟁</th>
+              <th style={HEAD}>광고 클릭</th>
               <th style={{ ...HEAD, textAlign: 'left' }}>표시</th>
             </tr>
           </thead>
           <tbody>
             {rows.slice(0, limit).map((r) => (
-              <tr key={r.id}>
+              <tr key={r.id} style={r.inRange === false ? { opacity: 0.45 } : undefined}>
                 <td style={CELL}>{r.rank}</td>
                 <td style={LEFT}>{r.keyword}</td>
                 <td style={{ ...CELL, fontWeight: 700 }}>{num(r.score)}</td>
@@ -64,6 +66,7 @@ export function ResearchTable({ run, initialLimit = 30 }) {
                 <td style={CELL}>{times(r.yoy)}</td>
                 <td style={CELL}>{times(r.momentum)}</td>
                 <td style={CELL}>{r.compIdx || '—'}</td>
+                <td style={CELL}>{num(r.adClicks)}</td>
                 <td style={LEFT}>{r.flags?.join(', ') || ''}</td>
               </tr>
             ))}
@@ -77,7 +80,7 @@ export function ResearchTable({ run, initialLimit = 30 }) {
       )}
       <p className="hint">
         기회 점수 = 월 검색수 ÷ (블로그 글 + 1) × 성장률 × 100. 경쟁비 = 검색 1번당 이미 있는 블로그 글 수 (낮을수록
-        빈 시장). 광고 경쟁 &apos;높음&apos; = 광고주가 돈을 쓰는 키워드.
+        빈 시장). 광고 경쟁 &apos;높음&apos; = 광고주가 돈을 쓰는 키워드. 흐린 줄 = 거르기 조건을 못 넘어 보고서에서 빠짐.
       </p>
     </>
   );

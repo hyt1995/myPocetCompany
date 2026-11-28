@@ -2,8 +2,9 @@
 // (외부 의존 없음 → research/test 에서 테스트)
 
 import { KEYWORD_PATTERN, MAX_KEYWORD_LENGTH, MAX_KEYWORDS } from './capabilities.js';
+import { validateRanking } from './ranking.js';
 
-const PLAN_FIELDS = new Set(['title', 'keywords']);
+const PLAN_FIELDS = new Set(['title', 'keywords', 'ranking']);
 
 // 띄어쓰기를 하나로 정리한다. (글자는 바꾸지 않는다)
 export function normalizeKeyword(text) {
@@ -36,7 +37,8 @@ export function splitKeywords(text) {
     .filter(Boolean);
 }
 
-// 반환: { ok, errors: [문장], plan: { title, keywords: [{ id, keyword }] } }
+// 반환: { ok, errors: [문장], plan: { title, keywords: [{ id, keyword }], ranking } }
+// ranking(줄 세우기 기준)은 선택. 없으면 기본(기회 점수 순, 상위 40개).
 export function validatePlan(input) {
   const errors = [];
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -70,9 +72,12 @@ export function validatePlan(input) {
     keywords.push({ id: `k${keywords.length}`, keyword });
   });
 
+  const rank = validateRanking(input.ranking);
+  errors.push(...rank.errors);
+
   if (keywords.length === 0 && errors.length === 0) errors.push('키워드가 하나도 없어요.');
   if (keywords.length > MAX_KEYWORDS) errors.push(`키워드는 한 번에 ${MAX_KEYWORDS}개까지예요 (지금 ${keywords.length}개).`);
 
   if (errors.length) return { ok: false, errors, plan: null };
-  return { ok: true, errors: [], plan: { title, keywords } };
+  return { ok: true, errors: [], plan: { title, keywords, ranking: rank.ranking } };
 }

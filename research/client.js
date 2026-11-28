@@ -2,3 +2,5 @@
 
 export { ResearchProgress, ResearchTable } from './ui/ResearchTable';
 export { useResearchRunner } from './ui/useResearchRunner';
+export { default as RankingPicker, RunRankingEditor } from './ui/RankingPicker';
+export { DEFAULT_RANKING } from './capabilities.js';

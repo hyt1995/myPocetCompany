@@ -57,9 +57,25 @@ export function useResearchRunner(runId) {
     }
   }, [api, load, run, runId]);
 
+  // 줄 세우기 기준 바꾸기 (네이버를 다시 부르지 않는다)
+  const applyRanking = useCallback(
+    async (ranking) => {
+      setError('');
+      try {
+        const data = await api(`/api/research/runs/${runId}`, { method: 'PUT', body: JSON.stringify({ ranking }) });
+        setRun(data.run);
+        return data.run;
+      } catch (err) {
+        setError(err.message);
+        return null;
+      }
+    },
+    [api, runId],
+  );
+
   const stop = useCallback(() => {
     stopRef.current = true;
   }, []);
 
-  return { run, running, error, start, stop, reload: load };
+  return { run, running, error, start, stop, reload: load, applyRanking };
 }
